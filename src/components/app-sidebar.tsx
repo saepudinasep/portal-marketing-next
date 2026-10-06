@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 
-import { NavDocuments } from '@/components/nav-documents';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -16,17 +15,18 @@ import {
 } from '@/components/ui/sidebar';
 import {
   LayoutDashboardIcon,
-  ListIcon,
-  ChartBarIcon,
-  FolderIcon,
-  UsersIcon,
-  CameraIcon,
-  FileTextIcon,
-  DatabaseIcon,
-  FileChartColumnIcon,
-  FileIcon,
   CommandIcon,
+  GraduationCapIcon,
+  UserRoundCheckIcon,
+  SchoolIcon,
+  CalendarDaysIcon,
+  CalendarCheckIcon,
+  ChartNoAxesCombinedIcon,
+  CalendarClockIcon,
+  CalendarRangeIcon,
+  ClipboardCheckIcon,
 } from 'lucide-react';
+import { navMain } from '@/config/nav';
 
 const data = {
   user: {
@@ -37,93 +37,53 @@ const data = {
   navMain: [
     {
       title: 'Dashboard',
-      url: '#',
+      url: '/dashboard',
       icon: <LayoutDashboardIcon />,
     },
     {
-      title: 'Lifecycle',
-      url: '#',
-      icon: <ListIcon />,
+      title: 'Manage Student',
+      url: '/manage-student',
+      icon: <GraduationCapIcon />,
     },
     {
-      title: 'Analytics',
-      url: '#',
-      icon: <ChartBarIcon />,
+      title: 'Manage Teacher',
+      url: '/manage-teacher',
+      icon: <UserRoundCheckIcon />,
     },
     {
-      title: 'Projects',
-      url: '#',
-      icon: <FolderIcon />,
+      title: 'Manage Class',
+      url: '/manage-class',
+      icon: <SchoolIcon />,
     },
     {
-      title: 'Team',
-      url: '#',
-      icon: <UsersIcon />,
-    },
-  ],
-  navClouds: [
-    {
-      title: 'Capture',
-      icon: <CameraIcon />,
-      isActive: true,
-      url: '#',
-      items: [
-        {
-          title: 'Active Proposals',
-          url: '#',
-        },
-        {
-          title: 'Archived',
-          url: '#',
-        },
-      ],
+      title: 'Manage Schedule',
+      url: '/manage-schedule',
+      icon: <CalendarDaysIcon />,
     },
     {
-      title: 'Proposal',
-      icon: <FileTextIcon />,
-      url: '#',
-      items: [
-        {
-          title: 'Active Proposals',
-          url: '#',
-        },
-        {
-          title: 'Archived',
-          url: '#',
-        },
-      ],
+      title: 'Finalize Schedule',
+      url: '/finalize-schedule',
+      icon: <CalendarCheckIcon />,
     },
     {
-      title: 'Prompts',
-      icon: <FileTextIcon />,
-      url: '#',
-      items: [
-        {
-          title: 'Active Proposals',
-          url: '#',
-        },
-        {
-          title: 'Archived',
-          url: '#',
-        },
-      ],
-    },
-  ],
-  documents: [
-    {
-      name: 'Data Library',
-      url: '#',
-      icon: <DatabaseIcon />,
+      title: 'View Report Score',
+      url: '/view-report-score',
+      icon: <ChartNoAxesCombinedIcon />,
     },
     {
-      name: 'Reports',
-      url: '#',
-      icon: <FileChartColumnIcon />,
+      title: 'Teacher Schedule',
+      url: '/teacher-schedule',
+      icon: <CalendarClockIcon />,
     },
     {
-      name: 'Word Assistant',
-      url: '#',
-      icon: <FileIcon />,
+      title: 'Class Schedule',
+      url: '/class-schedule',
+      icon: <CalendarRangeIcon />,
+    },
+    {
+      title: 'View Score',
+      url: '/view-score',
+      icon: <ClipboardCheckIcon />,
     },
   ],
 };
@@ -144,8 +104,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavDocuments items={data.documents} />
+        <NavMain items={navMain.map(({ icon: Icon, ...item }) => ({ ...item, icon: <Icon /> }))} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={data.user} />
