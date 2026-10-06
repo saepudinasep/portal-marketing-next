@@ -1,7 +1,11 @@
+import type { Metadata } from 'next';
+
 import { AppSidebar } from '@/components/app-sidebar';
 import { SiteHeader } from '@/components/site-header';
 import { StudentTable } from '@/components/student-table';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+
+export const metadata: Metadata = { title: 'Manage Student' };
 
 export default function Page() {
   return (

@@ -1,7 +1,11 @@
+import type { Metadata } from 'next';
+
 import { AppSidebar } from '@/components/app-sidebar';
 import { Notifications } from '@/components/notifications';
 import { SiteHeader } from '@/components/site-header';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+
+export const metadata: Metadata = { title: 'Notifications' };
 
 export default function Page() {
   return (

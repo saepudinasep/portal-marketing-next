@@ -1,7 +1,11 @@
+import type { Metadata } from 'next';
+
 import { AppSidebar } from '@/components/app-sidebar';
 import { ManageClass } from '@/components/manage-class';
 import { SiteHeader } from '@/components/site-header';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+
+export const metadata: Metadata = { title: 'Manage Class' };
 
 export default function Page() {
   return (

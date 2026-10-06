@@ -1,3 +1,5 @@
+import type { Metadata } from 'next';
+
 import { AppSidebar } from '@/components/app-sidebar';
 import { DashboardTables } from '@/components/dashboard-tables';
 import { ReportScoreChart } from '@/components/report-score-chart';
@@ -5,6 +7,8 @@ import { ScheduleLoadChart } from '@/components/schedule-load-chart';
 import { SectionCards } from '@/components/section-cards';
 import { SiteHeader } from '@/components/site-header';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+
+export const metadata: Metadata = { title: 'Dashboard' };
 
 export default function Page() {
   return (
