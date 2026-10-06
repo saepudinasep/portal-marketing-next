@@ -11,7 +11,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'form'>)
         <div className='flex flex-col items-center gap-1 text-center'>
           <h1 className='text-2xl font-bold'>SMK Nusantara</h1>
           <p className='text-sm text-balance text-muted-foreground'>
-            Masukkan Username dan Password untuk masuk ke portal marketing
+            Masukkan Username dan Password untuk masuk ke Sistem Informasi Akademik SMK Nusantara.
           </p>
         </div>
         <Field>
