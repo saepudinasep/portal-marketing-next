@@ -34,7 +34,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               render={<a href='/dashboard' />}
             >
               <CommandIcon className='size-5!' />
-              <span className='text-base font-semibold'>Portal Marketing</span>
+              <span className='text-base font-semibold'>SMK Nusantara</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

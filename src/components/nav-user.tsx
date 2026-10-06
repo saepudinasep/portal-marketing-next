@@ -71,11 +71,6 @@ export function NavUser({
                 <CircleUserRoundIcon />
                 Account
               </DropdownMenuItem>
-              {/* <DropdownMenuItem>
-                <CreditCardIcon
-                />
-                Billing
-              </DropdownMenuItem> */}
               <DropdownMenuItem>
                 <BellIcon />
                 Notifications
