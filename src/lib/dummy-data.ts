@@ -57,8 +57,14 @@ export type Day = (typeof DAYS)[number];
 export const PASSING_SCORE = 70;
 
 export const shifts: Shift[] = [
-  '07:00 - 07:45', '07:45 - 08:30', '08:30 - 09:15', '09:30 - 10:15',
-  '10:15 - 11:00', '11:00 - 11:45', '12:30 - 13:15', '13:15 - 14:00',
+  '07:00 - 07:45',
+  '07:45 - 08:30',
+  '08:30 - 09:15',
+  '09:30 - 10:15',
+  '10:15 - 11:00',
+  '11:00 - 11:45',
+  '12:30 - 13:15',
+  '13:15 - 14:00',
 ].map((time, i) => ({ shiftId: i + 1, time }));
 
 export const teachers: Teacher[] = [
@@ -69,7 +75,10 @@ export const teachers: Teacher[] = [
   ['T0005', 'Agus Hermawan', 'Male', '081210000005', '1984-09-09'],
   ['T0006', 'Lestari Ayu', 'Female', '081210000006', '1990-05-17'],
 ].map(([teacherId, name, gender, phoneNumber, dateOfBirth]) => ({
-  teacherId, name, phoneNumber, dateOfBirth,
+  teacherId,
+  name,
+  phoneNumber,
+  dateOfBirth,
   gender: gender as Teacher['gender'],
   address: 'Jl. Pendidikan No. 12, Cirebon',
   photo: null,
@@ -85,7 +94,7 @@ export const subjects: Subject[] = [1, 2, 3].flatMap((g) =>
     finalExam: 50,
     shiftDuration: 2,
     grade: g + 9, // 10, 11, 12
-  }))
+  })),
 );
 
 // Keahlian guru (nama mata pelajaran) -> dipetakan ke semua SubjectID bernama sama
@@ -97,24 +106,53 @@ const expertiseByTeacher: Record<string, string[]> = {
   T0005: ['Informatika', 'Agama'],
   T0006: ['Agama', 'Matematika'],
 };
-export const expertise: Expertise[] = Object.entries(expertiseByTeacher).flatMap(
-  ([teacherId, names]) =>
-    subjects.filter((s) => names.includes(s.name)).map((s) => ({ teacherId, subjectId: s.subjectId }))
-).map((e, i) => ({ expertiseId: i + 1, ...e }));
+export const expertise: Expertise[] = Object.entries(expertiseByTeacher)
+  .flatMap(([teacherId, names]) =>
+    subjects
+      .filter((s) => names.includes(s.name))
+      .map((s) => ({ teacherId, subjectId: s.subjectId })),
+  )
+  .map((e, i) => ({ expertiseId: i + 1, ...e }));
 
 export const classes: ClassRoom[] = [
-  { className: 'XA', grade: 10 }, { className: 'XB', grade: 10 },
-  { className: 'XIA', grade: 11 }, { className: 'XIB', grade: 11 },
-  { className: 'XIIA', grade: 12 }, { className: 'XIIB', grade: 12 },
+  { className: 'XA', grade: 10 },
+  { className: 'XB', grade: 10 },
+  { className: 'XIA', grade: 11 },
+  { className: 'XIB', grade: 11 },
+  { className: 'XIIA', grade: 12 },
+  { className: 'XIIB', grade: 12 },
 ];
 
 const studentSeed: [string, 'Male' | 'Female'][] = [
-  ['Mami Rahayu', 'Female'], ['Sonja Tabun', 'Female'], ['Bryan Sentosa', 'Male'], ['Honda Katsuki', 'Male'],
-  ['Merry Anggraeni', 'Female'], ['Brandon Wijaya', 'Male'], ['Marco Nugraha', 'Male'], ['Elsa Putri', 'Female'],
-  ['Windy Lestari', 'Female'], ['Rizky Ramadhan', 'Male'], ['Nadia Safitri', 'Female'], ['Fajar Hidayat', 'Male'],
-  ['Putri Maharani', 'Female'], ['Dimas Saputra', 'Male'], ['Citra Kirana', 'Female'], ['Eko Prasetyo', 'Male'],
-  ['Dewi Anggun', 'Female'], ['Hendra Gunawan', 'Male'], ['Intan Permata', 'Female'], ['Yusuf Maulana', 'Male'],
-  ['Anisa Fitri', 'Female'], ['Galih Pangestu', 'Male'], ['Rina Marlina', 'Female'], ['Taufik Hidayah', 'Male'],
+  ['Mami Rahayu', 'Female'],
+  ['Sonja Tabun', 'Female'],
+  ['Bryan Sentosa', 'Male'],
+  ['Honda Katsuki', 'Male'],
+  ['Merry Anggraeni', 'Female'],
+  ['Brandon Wijaya', 'Male'],
+  ['Marco Nugraha', 'Male'],
+  ['Elsa Putri', 'Female'],
+  ['Windy Lestari', 'Female'],
+  ['Rizky Ramadhan', 'Male'],
+  ['Nadia Safitri', 'Female'],
+  ['Fajar Hidayat', 'Male'],
+  ['Putri Maharani', 'Female'],
+  ['Dimas Saputra', 'Male'],
+  ['Citra Kirana', 'Female'],
+  ['Eko Prasetyo', 'Male'],
+  ['Dewi Anggun', 'Female'],
+  ['Hendra Gunawan', 'Male'],
+  ['Intan Permata', 'Female'],
+  ['Yusuf Maulana', 'Male'],
+  ['Anisa Fitri', 'Female'],
+  ['Galih Pangestu', 'Male'],
+  ['Rina Marlina', 'Female'],
+  ['Taufik Hidayah', 'Male'],
+  // 4 siswa baru yang belum ditempatkan di kelas (untuk demo Manage Class)
+  ['Salsa Amelia', 'Female'],
+  ['Raka Firmansyah', 'Male'],
+  ['Tika Oktaviani', 'Female'],
+  ['Bagas Wicaksono', 'Male'],
 ];
 export const students: Student[] = studentSeed.map(([name, gender], i) => ({
   studentId: `2016${String(i + 1).padStart(4, '0')}`,
@@ -127,7 +165,7 @@ export const students: Student[] = studentSeed.map(([name, gender], i) => ({
 }));
 
 // 4 siswa per kelas
-export const detailClasses: DetailClass[] = students.map((s, i) => ({
+export const detailClasses: DetailClass[] = students.slice(0, 24).map((s, i) => ({
   detailClassId: i + 1,
   className: classes[Math.floor(i / 4)].className,
   studentId: s.studentId,
@@ -155,7 +193,7 @@ export const detailSchedules: DetailSchedule[] = classes
         teacherId: teacherFor(s, ci),
         shiftId: 1 + ((ci * 3 + si * 2) % 8),
         day: DAYS[(ci + si) % 5],
-      }))
+      })),
   )
   .map((d, i) => ({ detailId: i + 1, ...d }));
 
@@ -168,8 +206,11 @@ function rand(seed: number, min = 55, max = 98) {
 export const detailScores: DetailScore[] = detailClasses
   .flatMap((dc) =>
     detailSchedules
-      .filter((d) => headerSchedules.find((h) => h.scheduleId === d.scheduleId)?.className === dc.className)
-      .map((d) => ({ detailId: d.detailId, studentId: dc.studentId }))
+      .filter(
+        (d) =>
+          headerSchedules.find((h) => h.scheduleId === d.scheduleId)?.className === dc.className,
+      )
+      .map((d) => ({ detailId: d.detailId, studentId: dc.studentId })),
   )
   .map((r, i) => ({
     scoreDetailId: i + 1,
@@ -188,7 +229,8 @@ export function finalScore(score: DetailScore, subject: Subject): number {
   const v =
     ((score.assignment ?? 0) * subject.assignment +
       (score.midExam ?? 0) * subject.midExam +
-      (score.finalExam ?? 0) * subject.finalExam) / 100;
+      (score.finalExam ?? 0) * subject.finalExam) /
+    100;
   return Math.round(v * 10) / 10;
 }
 
@@ -200,7 +242,8 @@ export const scoreRows: ScoreRow[] = detailScores.map((sc) => {
   return { ...sc, subject, className, grade: subject.grade, final: finalScore(sc, subject) };
 });
 
-const avg = (n: number[]) => (n.length ? Math.round((n.reduce((a, b) => a + b, 0) / n.length) * 10) / 10 : 0);
+const avg = (n: number[]) =>
+  n.length ? Math.round((n.reduce((a, b) => a + b, 0) / n.length) * 10) / 10 : 0;
 
 /** Data chart "Report Score": rata-rata nilai akhir per tingkat (X/XI/XII), kelas A vs B. */
 export function reportScore(subjectName: string) {
@@ -226,7 +269,11 @@ export function sessionsPerDay() {
     const list = detailSchedules.filter((d) => d.day === day);
     const isFinal = (d: DetailSchedule) =>
       headerSchedules.find((h) => h.scheduleId === d.scheduleId)?.finalize === 1;
-    return { day: day.slice(0, 3), finalized: list.filter(isFinal).length, draft: list.filter((d) => !isFinal(d)).length };
+    return {
+      day: day.slice(0, 3),
+      finalized: list.filter(isFinal).length,
+      draft: list.filter((d) => !isFinal(d)).length,
+    };
   });
 }
 
@@ -242,27 +289,31 @@ export function dashboardStats() {
     finalized,
     schedules: headerSchedules.length,
     avgFinal: avg(scoreRows.map((r) => r.final)),
-    passRate: Math.round((scoreRows.filter((r) => r.final >= PASSING_SCORE).length / scoreRows.length) * 100),
+    passRate: Math.round(
+      (scoreRows.filter((r) => r.final >= PASSING_SCORE).length / scoreRows.length) * 100,
+    ),
   };
 }
 
 export function studentSummaries() {
-  return students.map((s) => {
-    const rows = scoreRows.filter((r) => r.studentId === s.studentId);
-    const className = detailClasses.find((d) => d.studentId === s.studentId)!.className;
-    const final = avg(rows.map((r) => r.final));
-    return {
-      studentId: s.studentId,
-      name: s.name,
-      gender: s.gender,
-      className,
-      assignment: avg(rows.map((r) => r.assignment ?? 0)),
-      midExam: avg(rows.map((r) => r.midExam ?? 0)),
-      finalExam: avg(rows.map((r) => r.finalExam ?? 0)),
-      final,
-      passed: final >= PASSING_SCORE,
-    };
-  });
+  return students
+    .filter((s) => detailClasses.some((d) => d.studentId === s.studentId))
+    .map((s) => {
+      const rows = scoreRows.filter((r) => r.studentId === s.studentId);
+      const className = detailClasses.find((d) => d.studentId === s.studentId)!.className;
+      const final = avg(rows.map((r) => r.final));
+      return {
+        studentId: s.studentId,
+        name: s.name,
+        gender: s.gender,
+        className,
+        assignment: avg(rows.map((r) => r.assignment ?? 0)),
+        midExam: avg(rows.map((r) => r.midExam ?? 0)),
+        finalExam: avg(rows.map((r) => r.finalExam ?? 0)),
+        final,
+        passed: final >= PASSING_SCORE,
+      };
+    });
 }
 
 export function scheduleFor(className: string) {
@@ -287,7 +338,13 @@ export function scheduleFor(className: string) {
 export function teacherSummaries() {
   return teachers.map((t) => ({
     ...t,
-    subjects: [...new Set(expertise.filter((e) => e.teacherId === t.teacherId).map((e) => getSubject(e.subjectId).name))],
+    subjects: [
+      ...new Set(
+        expertise
+          .filter((e) => e.teacherId === t.teacherId)
+          .map((e) => getSubject(e.subjectId).name),
+      ),
+    ],
     sessions: detailSchedules.filter((d) => d.teacherId === t.teacherId).length,
   }));
 }
