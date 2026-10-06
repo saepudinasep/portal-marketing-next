@@ -8,7 +8,7 @@ export function ResetPasswordForm({ ...props }: React.ComponentProps<typeof Card
     <Card {...props}>
       <CardHeader>
         <CardTitle>Reset Password</CardTitle>
-        <CardDescription>Enter your information below to reset your password</CardDescription>
+        <CardDescription>Masukkan informasi Anda di bawah untuk mereset password</CardDescription>
       </CardHeader>
       <CardContent>
         <form>

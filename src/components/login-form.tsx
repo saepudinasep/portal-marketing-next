@@ -9,14 +9,14 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'form'>)
     <form className={cn('flex flex-col gap-6', className)} {...props}>
       <FieldGroup>
         <div className='flex flex-col items-center gap-1 text-center'>
-          <h1 className='text-2xl font-bold'>Login Portal Marketing</h1>
+          <h1 className='text-2xl font-bold'>SMK Nusantara</h1>
           <p className='text-sm text-balance text-muted-foreground'>
-            Masukkan NIK dan Password untuk masuk ke portal marketing
+            Masukkan Username dan Password untuk masuk ke portal marketing
           </p>
         </div>
         <Field>
-          <FieldLabel htmlFor='nik'>NIK</FieldLabel>
-          <Input id='nik' type='text' placeholder='Masukkan NIK' required />
+          <FieldLabel htmlFor='username'>Username</FieldLabel>
+          <Input id='username' type='text' placeholder='Masukkan Username' required />
         </Field>
         <Field>
           <div className='flex items-center'>

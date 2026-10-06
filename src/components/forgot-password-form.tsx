@@ -8,14 +8,14 @@ export function ForgotPasswordForm({ ...props }: React.ComponentProps<typeof Car
     <Card {...props}>
       <CardHeader>
         <CardTitle>Lupa Password</CardTitle>
-        <CardDescription>Enter your information below to reset your password</CardDescription>
+        <CardDescription>Masukkan Username Anda untuk mereset password</CardDescription>
       </CardHeader>
       <CardContent>
         <form>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor='nik'>NIK</FieldLabel>
-              <Input id='nik' type='text' placeholder='Masukkan NIK' required />
+              <FieldLabel htmlFor='username'>Username</FieldLabel>
+              <Input id='username' type='text' placeholder='Masukkan Username' required />
             </Field>
             <Field>
               <FieldLabel htmlFor='newPassword'>New Password</FieldLabel>
