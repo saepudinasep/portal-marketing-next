@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { GraduationCapIcon, MarsIcon, PlusIcon, VenusIcon } from 'lucide-react';
+import { CalendarCheckIcon, GraduationCapIcon, MarsIcon, PlusIcon, VenusIcon } from 'lucide-react';
 
 import { SimpleDataTable, type Column } from '@/components/simple-data-table';
 import { StatCards } from '@/components/stat-cards';
@@ -23,20 +23,25 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { classes, students as initialStudents, type Student } from '@/lib/dummy-data';
+import {
+  classes,
+  detailSchedules,
+  teachers as initialTeachers,
+  type Teacher,
+} from '@/lib/dummy-data';
 
 // columns berisi fungsi, jadi harus didefinisikan di file client (bukan di page server)
-const columns: Column<Student>[] = [
-  { header: 'Student ID', cell: (s) => s.studentId },
-  { header: 'Name', cell: (s) => s.name, className: 'font-medium' },
-  { header: 'Address', cell: (s) => s.address },
-  { header: 'Gender', cell: (s) => s.gender },
-  { header: 'Date of Birth', cell: (s) => s.dateOfBirth },
-  { header: 'Phone Number', cell: (s) => s.phoneNumber },
+const columns: Column<Teacher>[] = [
+  { header: 'Teacher ID', cell: (t) => t.teacherId },
+  { header: 'Name', cell: (t) => t.name, className: 'font-medium' },
+  { header: 'Address', cell: (t) => t.address },
+  { header: 'Gender', cell: (t) => t.gender },
+  { header: 'Date of Birth', cell: (t) => t.dateOfBirth },
+  { header: 'Phone Number', cell: (t) => t.phoneNumber },
 ];
 
-const emptyStudent: Student = {
-  studentId: '',
+const emptyTeacher: Teacher = {
+  teacherId: '',
   name: '',
   address: '',
   gender: 'Male',
@@ -46,24 +51,24 @@ const emptyStudent: Student = {
 };
 
 /** Satu form untuk Insert dan Update. Batas panjang mengikuti data dictionary. */
-function StudentFormSheet({
+function TeacherFormSheet({
   mode,
-  student,
+  teacher,
   existingIds,
   onSave,
   onClose,
 }: {
   mode: 'insert' | 'update';
-  student: Student;
+  teacher: Teacher;
   existingIds: string[];
-  onSave: (s: Student) => void;
+  onSave: (t: Teacher) => void;
   onClose: () => void;
 }) {
-  const [form, setForm] = React.useState<Student>(student);
-  const set = <K extends keyof Student>(key: K, value: Student[K]) =>
+  const [form, setForm] = React.useState<Teacher>(teacher);
+  const set = <K extends keyof Teacher>(key: K, value: Teacher[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
-  const id = form.studentId.trim();
+  const id = form.teacherId.trim();
   const duplicateId = mode === 'insert' && existingIds.includes(id);
   const valid =
     id !== '' &&
@@ -77,28 +82,28 @@ function StudentFormSheet({
     <Sheet open onOpenChange={(open) => !open && onClose()}>
       <SheetContent>
         <SheetHeader>
-          <SheetTitle>{mode === 'insert' ? 'Insert Student' : 'Update Student'}</SheetTitle>
+          <SheetTitle>{mode === 'insert' ? 'Insert Teacher' : 'Update Teacher'}</SheetTitle>
           <SheetDescription>
             {mode === 'insert'
-              ? 'Fill in the data for the new student.'
-              : `Edit data for ${student.studentId}.`}
+              ? 'Fill in the data for the new teacher.'
+              : `Edit data for ${teacher.teacherId}.`}
           </SheetDescription>
         </SheetHeader>
         <div className='flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4'>
           <div className='flex flex-col gap-2'>
-            <Label htmlFor='studentId'>Student ID</Label>
+            <Label htmlFor='teacherId'>Teacher ID</Label>
             <Input
-              id='studentId'
+              id='teacherId'
               maxLength={8}
-              value={form.studentId}
+              value={form.teacherId}
               disabled={mode === 'update'}
               aria-invalid={duplicateId}
-              onChange={(e) => set('studentId', e.target.value)}
+              onChange={(e) => set('teacherId', e.target.value)}
             />
-            {duplicateId && <p className='text-xs text-destructive'>Student ID already exists.</p>}
+            {duplicateId && <p className='text-xs text-destructive'>Teacher ID already exists.</p>}
           </div>
           <div className='flex flex-col gap-2'>
-            <Label htmlFor='name'>Student Name</Label>
+            <Label htmlFor='name'>Teacher Name</Label>
             <Input
               id='name'
               maxLength={50}
@@ -110,7 +115,7 @@ function StudentFormSheet({
             <Label htmlFor='address'>Address</Label>
             <Input
               id='address'
-              maxLength={150}
+              maxLength={100}
               value={form.address}
               onChange={(e) => set('address', e.target.value)}
             />
@@ -119,7 +124,7 @@ function StudentFormSheet({
             <Label>Gender</Label>
             <Select
               value={form.gender}
-              onValueChange={(v) => v && set('gender', v as Student['gender'])}
+              onValueChange={(v) => v && set('gender', v as Teacher['gender'])}
             >
               <SelectTrigger className='w-full' aria-label='Gender'>
                 <SelectValue />
@@ -150,7 +155,7 @@ function StudentFormSheet({
           </div>
         </div>
         <SheetFooter className='border-t'>
-          <Button disabled={!valid} onClick={() => onSave({ ...form, studentId: id })}>
+          <Button disabled={!valid} onClick={() => onSave({ ...form, teacherId: id })}>
             Save
           </Button>
           <Button variant='outline' onClick={onClose}>
@@ -162,44 +167,56 @@ function StudentFormSheet({
   );
 }
 
-export function StudentTable() {
-  const [data, setData] = React.useState<Student[]>(initialStudents);
-  const [editing, setEditing] = React.useState<Student | null>(null);
+export function TeacherTable() {
+  const [data, setData] = React.useState<Teacher[]>(initialTeachers);
+  const [editing, setEditing] = React.useState<Teacher | null>(null);
   const [inserting, setInserting] = React.useState(false);
 
   // Card ikut berubah saat data di-insert/update/delete
   const total = data.length;
-  const male = data.filter((s) => s.gender === 'Male').length;
+  const male = data.filter((t) => t.gender === 'Male').length;
   const female = total - male;
+  // Guru terhubung ke jadwal lewat DetailSchedule.teacherId (DetailClass hanya untuk siswa)
+  const scheduled = data.filter((t) =>
+    detailSchedules.some((d) => d.teacherId === t.teacherId),
+  ).length;
   const pct = (n: number) => (total ? `${Math.round((n / total) * 100)}%` : '0%');
 
   return (
-    <div className='flex flex-col gap-3'>
+    <div className='flex flex-col gap-4 md:gap-6'>
       <StatCards
         items={[
           {
-            label: 'Total Students',
+            label: 'Total Teachers',
             value: total,
             icon: GraduationCapIcon,
             badge: `${classes.length} classes`,
-            title: 'Registered students',
-            note: 'Across grade X, XI and XII',
+            title: 'Registered teachers',
+            note: 'Teaching grade X, XI and XII',
           },
           {
-            label: 'Male Students',
+            label: 'Male Teachers',
             value: male,
             icon: MarsIcon,
             badge: pct(male),
-            title: 'Male students',
-            note: `${male} of ${total} students`,
+            title: 'Male teachers',
+            note: `${male} of ${total} teachers`,
           },
           {
-            label: 'Female Students',
+            label: 'Female Teachers',
             value: female,
             icon: VenusIcon,
             badge: pct(female),
-            title: 'Female students',
-            note: `${female} of ${total} students`,
+            title: 'Female teachers',
+            note: `${female} of ${total} teachers`,
+          },
+          {
+            label: 'With Teaching Schedule',
+            value: `${scheduled}/${total}`,
+            icon: CalendarCheckIcon,
+            badge: pct(scheduled),
+            title: `${total - scheduled} teachers without a schedule`,
+            note: 'Manage in the Manage Schedule page',
           },
         ]}
       />
@@ -207,11 +224,11 @@ export function StudentTable() {
       <SimpleDataTable
         data={data}
         columns={columns}
-        getRowId={(s) => s.studentId}
-        getRowLabel={(s) => s.name}
-        searchText={(s) => `${s.studentId} ${s.name}`}
+        getRowId={(t) => t.teacherId}
+        getRowLabel={(t) => t.name}
+        searchText={(t) => `${t.teacherId} ${t.name}`}
         onEdit={setEditing}
-        onDelete={(s) => setData((d) => d.filter((x) => x.studentId !== s.studentId))}
+        onDelete={(t) => setData((d) => d.filter((x) => x.teacherId !== t.teacherId))}
         toolbarActions={
           <Button onClick={() => setInserting(true)}>
             <PlusIcon />
@@ -221,26 +238,26 @@ export function StudentTable() {
       />
 
       {inserting && (
-        <StudentFormSheet
+        <TeacherFormSheet
           mode='insert'
-          student={emptyStudent}
-          existingIds={data.map((s) => s.studentId)}
+          teacher={emptyTeacher}
+          existingIds={data.map((t) => t.teacherId)}
           onClose={() => setInserting(false)}
-          onSave={(s) => {
-            setData((d) => [s, ...d]); // tampil paling atas
+          onSave={(t) => {
+            setData((d) => [t, ...d]); // tampil paling atas
             setInserting(false);
           }}
         />
       )}
       {editing && (
-        <StudentFormSheet
-          key={editing.studentId}
+        <TeacherFormSheet
+          key={editing.teacherId}
           mode='update'
-          student={editing}
+          teacher={editing}
           existingIds={[]}
           onClose={() => setEditing(null)}
-          onSave={(s) => {
-            setData((d) => d.map((x) => (x.studentId === s.studentId ? s : x)));
+          onSave={(t) => {
+            setData((d) => d.map((x) => (x.teacherId === t.teacherId ? t : x)));
             setEditing(null);
           }}
         />

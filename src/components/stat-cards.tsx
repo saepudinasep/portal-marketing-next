@@ -19,10 +19,20 @@ export type StatCardItem = {
   note: string;
 };
 
-/** Baris card ringkasan yang bisa dipakai ulang di halaman mana pun. */
+// Kelas harus ditulis utuh (Tailwind tidak mendeteksi class yang disusun dinamis)
+const gridCols: Record<number, string> = {
+  1: '',
+  2: '@xl/main:grid-cols-2',
+  3: '@3xl/main:grid-cols-3',
+  4: '@xl/main:grid-cols-2 @5xl/main:grid-cols-4',
+};
+
+/** Baris card ringkasan yang bisa dipakai ulang; jumlah kolom menyesuaikan jumlah card. */
 export function StatCards({ items }: { items: StatCardItem[] }) {
   return (
-    <div className='grid grid-cols-1 gap-4 *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs @xl/main:grid-cols-2 @5xl/main:grid-cols-4 dark:*:data-[slot=card]:bg-card'>
+    <div
+      className={`grid grid-cols-1 gap-4 *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs dark:*:data-[slot=card]:bg-card ${gridCols[items.length] ?? gridCols[4]}`}
+    >
       {items.map(({ label, value, icon: Icon, badge, title, note }) => (
         <Card key={label} className='@container/card'>
           <CardHeader>
