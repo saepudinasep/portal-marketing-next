@@ -17,6 +17,8 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useFakeLoad } from '@/lib/fake-api';
 import {
   Select,
   SelectContent,
@@ -33,6 +35,7 @@ const chartConfig = {
 
 export function ReportScoreChart() {
   const [subject, setSubject] = React.useState(subjectOptions[0]);
+  const loading = useFakeLoad(subject); // ganti dengan isLoading dari API
   const { chart, passedPercentage } = React.useMemo(() => reportScore(subject), [subject]);
 
   return (
@@ -40,7 +43,8 @@ export function ReportScoreChart() {
       <CardHeader>
         <CardTitle>Report Score</CardTitle>
         <CardDescription>
-          Average final score per grade · Passed percentage: {passedPercentage}% (min. {PASSING_SCORE})
+          Average final score per grade · Passed percentage: {passedPercentage}% (min.{' '}
+          {PASSING_SCORE})
         </CardDescription>
         <CardAction>
           <Select value={subject} onValueChange={(v) => v && setSubject(v)}>
@@ -58,20 +62,24 @@ export function ReportScoreChart() {
         </CardAction>
       </CardHeader>
       <CardContent className='px-2 pt-4 sm:px-6 sm:pt-6'>
-        <ChartContainer config={chartConfig} className='aspect-auto h-[250px] w-full'>
-          <BarChart data={chart} margin={{ top: 20 }}>
-            <CartesianGrid vertical={false} />
-            <XAxis dataKey='grade' tickLine={false} axisLine={false} tickMargin={8} />
-            <YAxis domain={[0, 100]} tickLine={false} axisLine={false} width={32} />
-            <ChartTooltip cursor={false} content={<ChartTooltipContent indicator='dot' />} />
-            <Bar dataKey='classA' fill='var(--color-classA)' radius={4}>
-              <LabelList dataKey='classA' position='top' className='fill-foreground text-xs' />
-            </Bar>
-            <Bar dataKey='classB' fill='var(--color-classB)' radius={4}>
-              <LabelList dataKey='classB' position='top' className='fill-foreground text-xs' />
-            </Bar>
-          </BarChart>
-        </ChartContainer>
+        {loading ? (
+          <Skeleton className='h-[250px] w-full' aria-busy='true' />
+        ) : (
+          <ChartContainer config={chartConfig} className='aspect-auto h-[250px] w-full'>
+            <BarChart data={chart} margin={{ top: 20 }}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey='grade' tickLine={false} axisLine={false} tickMargin={8} />
+              <YAxis domain={[0, 100]} tickLine={false} axisLine={false} width={32} />
+              <ChartTooltip cursor={false} content={<ChartTooltipContent indicator='dot' />} />
+              <Bar dataKey='classA' fill='var(--color-classA)' radius={4}>
+                <LabelList dataKey='classA' position='top' className='fill-foreground text-xs' />
+              </Bar>
+              <Bar dataKey='classB' fill='var(--color-classB)' radius={4}>
+                <LabelList dataKey='classB' position='top' className='fill-foreground text-xs' />
+              </Bar>
+            </BarChart>
+          </ChartContainer>
+        )}
       </CardContent>
     </Card>
   );

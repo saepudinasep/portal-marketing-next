@@ -28,6 +28,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
 import {
   Select,
   SelectContent,
@@ -59,12 +61,15 @@ type Props<T> = {
   /** Kalau diisi, menu "Update" muncul di kolom Actions. */
   onEdit?: (row: T) => void;
   /** Kalau diisi, menu "Delete" muncul (dengan konfirmasi). */
-  onDelete?: (row: T) => void;
+  /** Boleh async: dialog tetap terbuka dengan spinner sampai selesai. */
+  onDelete?: (row: T) => void | Promise<void>;
   /** Teks pada konfirmasi hapus, misal nama siswa. */
   getRowLabel?: (row: T) => string;
   pageSizeOptions?: number[];
   /** Tombol tambahan di sisi kanan toolbar, misal tombol Insert. */
   toolbarActions?: React.ReactNode;
+  /** Tampilkan skeleton saat data sedang dibaca. */
+  loading?: boolean;
 };
 
 export function SimpleDataTable<T>({
@@ -77,11 +82,13 @@ export function SimpleDataTable<T>({
   getRowLabel,
   pageSizeOptions = [5, 10, 20],
   toolbarActions,
+  loading = false,
 }: Props<T>) {
   const [q, setQ] = React.useState('');
   const [page, setPage] = React.useState(0);
   const [pageSize, setPageSize] = React.useState(pageSizeOptions[0]);
   const [toDelete, setToDelete] = React.useState<T | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
 
   const filtered = searchText
     ? data.filter((r) => searchText(r).toLowerCase().includes(q.toLowerCase()))
@@ -127,41 +134,57 @@ export function SimpleDataTable<T>({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((r) => (
-              <TableRow key={getRowId(r)}>
-                {columns.map((c) => (
-                  <TableCell key={c.header} className={c.className}>
-                    {c.cell(r)}
-                  </TableCell>
-                ))}
-                {hasActions && (
-                  <TableCell className='text-right'>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger render={<Button variant='ghost' size='icon-sm' />}>
-                        <MoreHorizontalIcon />
-                        <span className='sr-only'>Open actions</span>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align='end' className='w-32'>
-                        {onEdit && (
-                          <DropdownMenuItem onClick={() => onEdit(r)}>
-                            <PencilIcon />
-                            <span>Update</span>
-                          </DropdownMenuItem>
-                        )}
-                        {onEdit && onDelete && <DropdownMenuSeparator />}
-                        {onDelete && (
-                          <DropdownMenuItem variant='destructive' onClick={() => setToDelete(r)}>
-                            <Trash2Icon />
-                            <span>Delete</span>
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                )}
-              </TableRow>
-            ))}
-            {rows.length === 0 && (
+            {loading &&
+              Array.from({ length: pageSize }).map((_, i) => (
+                <TableRow key={`skeleton-${i}`} aria-busy='true'>
+                  {columns.map((c) => (
+                    <TableCell key={c.header}>
+                      <Skeleton className='h-4 w-full max-w-40' />
+                    </TableCell>
+                  ))}
+                  {hasActions && (
+                    <TableCell className='text-right'>
+                      <Skeleton className='ml-auto size-6' />
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            {!loading &&
+              rows.map((r) => (
+                <TableRow key={getRowId(r)}>
+                  {columns.map((c) => (
+                    <TableCell key={c.header} className={c.className}>
+                      {c.cell(r)}
+                    </TableCell>
+                  ))}
+                  {hasActions && (
+                    <TableCell className='text-right'>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger render={<Button variant='ghost' size='icon-sm' />}>
+                          <MoreHorizontalIcon />
+                          <span className='sr-only'>Open actions</span>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align='end' className='w-32'>
+                          {onEdit && (
+                            <DropdownMenuItem onClick={() => onEdit(r)}>
+                              <PencilIcon />
+                              <span>Update</span>
+                            </DropdownMenuItem>
+                          )}
+                          {onEdit && onDelete && <DropdownMenuSeparator />}
+                          {onDelete && (
+                            <DropdownMenuItem variant='destructive' onClick={() => setToDelete(r)}>
+                              <Trash2Icon />
+                              <span>Delete</span>
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            {!loading && rows.length === 0 && (
               <TableRow>
                 <TableCell
                   colSpan={columns.length + (hasActions ? 1 : 0)}
@@ -178,9 +201,16 @@ export function SimpleDataTable<T>({
       {/* Pagination */}
       <div className='flex flex-col items-center justify-between gap-3 text-sm sm:flex-row'>
         <div className='text-muted-foreground'>
-          {filtered.length === 0
-            ? '0 rows'
-            : `Showing ${start + 1}-${Math.min(start + pageSize, filtered.length)} of ${filtered.length}`}
+          {loading ? (
+            <span className='inline-flex items-center gap-2'>
+              <Spinner />
+              Loading data...
+            </span>
+          ) : filtered.length === 0 ? (
+            '0 rows'
+          ) : (
+            `Showing ${start + 1}-${Math.min(start + pageSize, filtered.length)} of ${filtered.length}`
+          )}
         </div>
         <div className='flex items-center gap-4'>
           <div className='flex items-center gap-2'>
@@ -250,7 +280,10 @@ export function SimpleDataTable<T>({
       </div>
 
       {/* Konfirmasi hapus — dialog di tengah layar */}
-      <AlertDialog open={toDelete !== null} onOpenChange={(open) => !open && setToDelete(null)}>
+      <AlertDialog
+        open={toDelete !== null}
+        onOpenChange={(open) => !open && !deleting && setToDelete(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this row?</AlertDialogTitle>
@@ -260,17 +293,25 @@ export function SimpleDataTable<T>({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <Button variant='outline' onClick={() => setToDelete(null)}>
+            <Button variant='outline' disabled={deleting} onClick={() => setToDelete(null)}>
               Cancel
             </Button>
             <Button
               variant='destructive'
-              onClick={() => {
-                if (toDelete) onDelete?.(toDelete);
-                setToDelete(null);
+              disabled={deleting}
+              onClick={async () => {
+                if (!toDelete) return;
+                setDeleting(true);
+                try {
+                  await onDelete?.(toDelete);
+                } finally {
+                  setDeleting(false);
+                  setToDelete(null);
+                }
               }}
             >
-              Delete
+              {deleting && <Spinner />}
+              {deleting ? 'Deleting...' : 'Delete'}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

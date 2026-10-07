@@ -6,17 +6,29 @@ import { CameraIcon, CheckIcon, KeyRoundIcon } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
 import { currentProfile, currentUser } from '@/lib/current-user';
+import { wait } from '@/lib/fake-api';
 
 const MAX_PHOTO_MB = 2;
 
 function Success({ children }: { children: React.ReactNode }) {
   return (
-    <div role='status' className='flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2 text-sm'>
+    <div
+      role='status'
+      className='flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2 text-sm'
+    >
       <CheckIcon className='size-4 shrink-0' />
       {children}
     </div>
@@ -33,6 +45,7 @@ function ProfileCard() {
   });
   const [form, setForm] = React.useState(saved);
   const [photoError, setPhotoError] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
   const [message, setMessage] = React.useState('');
   const fileRef = React.useRef<HTMLInputElement>(null);
   const urlsRef = React.useRef<string[]>([]);
@@ -52,7 +65,8 @@ function ProfileCard() {
     e.target.value = '';
     if (!file) return;
     if (!file.type.startsWith('image/')) return setPhotoError('Please choose an image file.');
-    if (file.size > MAX_PHOTO_MB * 1024 * 1024) return setPhotoError(`Image must be at most ${MAX_PHOTO_MB} MB.`);
+    if (file.size > MAX_PHOTO_MB * 1024 * 1024)
+      return setPhotoError(`Image must be at most ${MAX_PHOTO_MB} MB.`);
     setPhotoError('');
     const url = URL.createObjectURL(file);
     urlsRef.current.push(url);
@@ -82,7 +96,11 @@ function ProfileCard() {
         <div className='flex items-center gap-4'>
           <div className='relative'>
             <Avatar className='size-24 rounded-xl'>
-              <AvatarImage src={form.photoUrl || currentUser.avatar} alt={form.name} className='rounded-xl' />
+              <AvatarImage
+                src={form.photoUrl || currentUser.avatar}
+                alt={form.name}
+                className='rounded-xl'
+              />
               <AvatarFallback className='rounded-xl text-xl'>{initials}</AvatarFallback>
             </Avatar>
             <Button
@@ -94,14 +112,23 @@ function ProfileCard() {
             >
               <CameraIcon />
             </Button>
-            <input ref={fileRef} type='file' accept='image/*' className='sr-only' onChange={onPickPhoto} tabIndex={-1} />
+            <input
+              ref={fileRef}
+              type='file'
+              accept='image/*'
+              className='sr-only'
+              onChange={onPickPhoto}
+              tabIndex={-1}
+            />
           </div>
           <div className='flex flex-col gap-1'>
             <span className='font-medium'>{form.name || '-'}</span>
             <Badge variant='outline' className='w-fit'>
               {currentUser.role}
             </Badge>
-            {form.photo && <span className='max-w-48 truncate text-xs text-muted-foreground'>{form.photo}</span>}
+            {form.photo && (
+              <span className='max-w-48 truncate text-xs text-muted-foreground'>{form.photo}</span>
+            )}
           </div>
         </div>
         {photoError && <p className='text-xs text-destructive'>{photoError}</p>}
@@ -112,7 +139,12 @@ function ProfileCard() {
         </div>
         <div className='flex flex-col gap-2'>
           <Label htmlFor='acc-name'>Name</Label>
-          <Input id='acc-name' maxLength={50} value={form.name} onChange={(e) => set({ name: e.target.value })} />
+          <Input
+            id='acc-name'
+            maxLength={50}
+            value={form.name}
+            onChange={(e) => set({ name: e.target.value })}
+          />
         </div>
         <div className='flex flex-col gap-2'>
           <Label htmlFor='acc-phone'>Phone Number</Label>
@@ -126,24 +158,33 @@ function ProfileCard() {
         </div>
         <div className='flex flex-col gap-2'>
           <Label htmlFor='acc-address'>Address</Label>
-          <Input id='acc-address' maxLength={100} value={form.address} onChange={(e) => set({ address: e.target.value })} />
+          <Input
+            id='acc-address'
+            maxLength={100}
+            value={form.address}
+            onChange={(e) => set({ address: e.target.value })}
+          />
         </div>
         {message && <Success>{message}</Success>}
       </CardContent>
       <CardFooter className='gap-2'>
         <Button
-          disabled={!dirty || !valid}
-          onClick={() => {
+          disabled={!dirty || !valid || saving}
+          onClick={async () => {
+            setSaving(true);
+            await wait(); // ganti dengan PATCH profil ke API
+            setSaving(false);
             setSaved({ ...form, name: form.name.trim(), address: form.address.trim() });
             setForm((f) => ({ ...f, name: f.name.trim(), address: f.address.trim() }));
             setMessage('Profile updated.');
           }}
         >
-          Save
+          {saving && <Spinner />}
+          {saving ? 'Saving...' : 'Save'}
         </Button>
         <Button
           variant='outline'
-          disabled={!dirty}
+          disabled={!dirty || saving}
           onClick={() => {
             setForm(saved);
             setPhotoError('');
@@ -165,6 +206,7 @@ function PasswordCard() {
   const [show, setShow] = React.useState(false);
   const [error, setError] = React.useState('');
   const [message, setMessage] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
 
   const type = show ? 'text' : 'password';
   const clear = () => {
@@ -172,11 +214,15 @@ function PasswordCard() {
     setMessage('');
   };
 
-  const save = () => {
+  const save = async () => {
     if (oldPw !== current) return setError('Old password is incorrect.');
-    if (newPw.length < 6 || newPw.length > 10) return setError('New password must be 6-10 characters.');
+    if (newPw.length < 6 || newPw.length > 10)
+      return setError('New password must be 6-10 characters.');
     if (newPw === oldPw) return setError('New password must be different from the old password.');
     if (confirmPw !== newPw) return setError('Confirm password does not match.');
+    setSaving(true);
+    await wait(); // ganti dengan POST ganti password ke API
+    setSaving(false);
     setCurrent(newPw);
     setOldPw('');
     setNewPw('');
@@ -250,8 +296,9 @@ function PasswordCard() {
         {message && <Success>{message}</Success>}
       </CardContent>
       <CardFooter>
-        <Button disabled={!oldPw || !newPw || !confirmPw} onClick={save}>
-          Save
+        <Button disabled={!oldPw || !newPw || !confirmPw || saving} onClick={save}>
+          {saving && <Spinner />}
+          {saving ? 'Saving...' : 'Save'}
         </Button>
       </CardFooter>
     </Card>

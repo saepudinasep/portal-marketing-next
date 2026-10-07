@@ -6,7 +6,14 @@ import { CalendarDaysIcon, SchoolIcon, UsersIcon } from 'lucide-react';
 import { SimpleDataTable, type Column } from '@/components/simple-data-table';
 import { StatCards } from '@/components/stat-cards';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -15,7 +22,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { useFakeLoad } from '@/lib/fake-api';
 import {
   DAYS,
   detailClasses,
@@ -58,7 +74,9 @@ function scheduleOf(teacherId: string): Row[] {
 }
 
 const studentsOfClass = (className: string): Student[] => {
-  const ids = new Set(detailClasses.filter((d) => d.className === className).map((d) => d.studentId));
+  const ids = new Set(
+    detailClasses.filter((d) => d.className === className).map((d) => d.studentId),
+  );
   return students.filter((s) => ids.has(s.studentId));
 };
 
@@ -69,19 +87,25 @@ export function TeacherSchedule() {
   const rows = scheduleOf(teacherId);
   // baris terpilih; kalau belum ada (atau ganti guru) otomatis baris pertama
   const selected = rows.find((r) => r.detailId === selectedId) ?? rows[0];
+  const loading = useFakeLoad(teacherId); // ganti dengan isLoading dari API
+  const studentsLoading = useFakeLoad(`${teacherId}|${selected?.className ?? ''}`);
   const classStudents = selected ? studentsOfClass(selected.className) : [];
 
   const classNames = [...new Set(rows.map((r) => r.className))];
   const taughtStudents = new Set(
-    detailClasses.filter((d) => classNames.includes(d.className)).map((d) => d.studentId)
+    detailClasses.filter((d) => classNames.includes(d.className)).map((d) => d.studentId),
   ).size;
   const activeDays = new Set(rows.map((r) => r.day)).size;
 
-  const teacherItems = teachers.map((t) => ({ value: t.teacherId, label: `${t.teacherId} - ${t.name}` }));
+  const teacherItems = teachers.map((t) => ({
+    value: t.teacherId,
+    label: `${t.teacherId} - ${t.name}`,
+  }));
 
   return (
     <div className='flex flex-col gap-4 md:gap-6'>
       <StatCards
+        loading={loading}
         items={[
           {
             label: 'Teaching Sessions',
@@ -152,32 +176,43 @@ export function TeacherSchedule() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((r) => {
-                  const active = selected?.detailId === r.detailId;
-                  return (
-                    <TableRow
-                      key={r.detailId}
-                      tabIndex={0}
-                      aria-selected={active}
-                      data-state={active ? 'selected' : undefined}
-                      className='cursor-pointer'
-                      onClick={() => setSelectedId(r.detailId)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          setSelectedId(r.detailId);
-                        }
-                      }}
-                    >
-                      <TableCell>{r.subjectId}</TableCell>
-                      <TableCell className='font-medium'>{r.subject}</TableCell>
-                      <TableCell>{r.className}</TableCell>
-                      <TableCell>{r.day}</TableCell>
-                      <TableCell className='tabular-nums'>{r.time}</TableCell>
+                {loading &&
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <TableRow key={`skeleton-${i}`} aria-busy='true'>
+                      {Array.from({ length: 5 }).map((__, j) => (
+                        <TableCell key={j}>
+                          <Skeleton className='h-4 w-full max-w-32' />
+                        </TableCell>
+                      ))}
                     </TableRow>
-                  );
-                })}
-                {rows.length === 0 && (
+                  ))}
+                {!loading &&
+                  rows.map((r) => {
+                    const active = selected?.detailId === r.detailId;
+                    return (
+                      <TableRow
+                        key={r.detailId}
+                        tabIndex={0}
+                        aria-selected={active}
+                        data-state={active ? 'selected' : undefined}
+                        className='cursor-pointer'
+                        onClick={() => setSelectedId(r.detailId)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setSelectedId(r.detailId);
+                          }
+                        }}
+                      >
+                        <TableCell>{r.subjectId}</TableCell>
+                        <TableCell className='font-medium'>{r.subject}</TableCell>
+                        <TableCell>{r.className}</TableCell>
+                        <TableCell>{r.day}</TableCell>
+                        <TableCell className='tabular-nums'>{r.time}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                {!loading && rows.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5} className='h-24 text-center text-muted-foreground'>
                       This teacher has no teaching schedule yet.
@@ -194,7 +229,9 @@ export function TeacherSchedule() {
         <CardHeader>
           <CardTitle>Student List</CardTitle>
           <CardDescription>
-            {selected ? `Class ${selected.className} · ${selected.subject}, ${selected.day} ${selected.time}` : 'No class selected'}
+            {selected
+              ? `Class ${selected.className} · ${selected.subject}, ${selected.day} ${selected.time}`
+              : 'No class selected'}
           </CardDescription>
           <CardAction>
             <Badge variant='outline'>{classStudents.length} students</Badge>
@@ -203,6 +240,7 @@ export function TeacherSchedule() {
         <CardContent>
           <SimpleDataTable
             key={selected?.className ?? 'none'}
+            loading={loading || studentsLoading}
             data={classStudents}
             columns={studentColumns}
             getRowId={(s) => s.studentId}

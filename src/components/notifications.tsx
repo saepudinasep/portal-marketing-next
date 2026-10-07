@@ -18,7 +18,10 @@ import {
 import { StatCards } from '@/components/stat-cards';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useFakeLoad, wait } from '@/lib/fake-api';
 import {
   formatDateTime,
   initialNotifications,
@@ -39,19 +42,38 @@ type Filter = 'all' | 'unread';
 export function Notifications() {
   const [items, setItems] = React.useState<AppNotification[]>(initialNotifications);
   const [filter, setFilter] = React.useState<Filter>('all');
+  const [busy, setBusy] = React.useState<{ id: number; action: 'read' | 'delete' } | null>(null);
+  const [markingAll, setMarkingAll] = React.useState(false);
+  const loading = useFakeLoad('notifications'); // ganti dengan isLoading dari API
 
   const total = items.length;
   const unread = items.filter((n) => !n.read).length;
   const scheduleItems = items.filter((n) => n.type === 'schedule');
   const visible = filter === 'unread' ? items.filter((n) => !n.read) : items;
 
-  const toggleRead = (id: number) =>
+  const toggleRead = async (id: number) => {
+    setBusy({ id, action: 'read' });
+    await wait(400); // ganti dengan PATCH ke API
     setItems((list) => list.map((n) => (n.id === id ? { ...n, read: !n.read } : n)));
-  const remove = (id: number) => setItems((list) => list.filter((n) => n.id !== id));
+    setBusy(null);
+  };
+  const remove = async (id: number) => {
+    setBusy({ id, action: 'delete' });
+    await wait(400); // ganti dengan DELETE ke API
+    setItems((list) => list.filter((n) => n.id !== id));
+    setBusy(null);
+  };
+  const markAllRead = async () => {
+    setMarkingAll(true);
+    await wait(); // ganti dengan PATCH ke API
+    setItems((list) => list.map((n) => ({ ...n, read: true })));
+    setMarkingAll(false);
+  };
 
   return (
     <div className='flex flex-col gap-4 md:gap-6'>
       <StatCards
+        loading={loading}
         items={[
           {
             label: 'All Notifications',
@@ -89,17 +111,30 @@ export function Notifications() {
         </Tabs>
         <Button
           variant='outline'
-          disabled={unread === 0}
-          onClick={() => setItems((list) => list.map((n) => ({ ...n, read: true })))}
+          disabled={unread === 0 || loading || markingAll}
+          onClick={markAllRead}
         >
-          <CheckCheckIcon />
+          {markingAll ? <Spinner /> : <CheckCheckIcon />}
           Mark all as read
         </Button>
       </div>
 
       <Card>
         <CardContent className='p-0'>
-          {visible.length === 0 ? (
+          {loading ? (
+            <ul className='divide-y' aria-busy='true'>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <li key={i} className='flex items-start gap-3 px-4 py-3'>
+                  <Skeleton className='size-9 shrink-0 rounded-lg' />
+                  <div className='flex flex-1 flex-col gap-2'>
+                    <Skeleton className='h-4 w-40' />
+                    <Skeleton className='h-4 w-full max-w-md' />
+                    <Skeleton className='h-3 w-28' />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : visible.length === 0 ? (
             <div className='flex h-40 flex-col items-center justify-center gap-2 text-sm text-muted-foreground'>
               <BellIcon className='size-6' />
               {filter === 'unread' ? 'No unread notifications.' : 'No notifications.'}
@@ -118,8 +153,17 @@ export function Notifications() {
                     </div>
                     <div className='min-w-0 flex-1'>
                       <div className='flex items-center gap-2'>
-                        {!n.read && <span className='size-2 shrink-0 rounded-full bg-primary' aria-label='Unread' />}
-                        <p className={`truncate text-sm ${n.read ? 'font-normal' : 'font-semibold'}`}>{n.title}</p>
+                        {!n.read && (
+                          <span
+                            className='size-2 shrink-0 rounded-full bg-primary'
+                            aria-label='Unread'
+                          />
+                        )}
+                        <p
+                          className={`truncate text-sm ${n.read ? 'font-normal' : 'font-semibold'}`}
+                        >
+                          {n.title}
+                        </p>
                       </div>
                       <p className='text-sm text-muted-foreground'>{n.message}</p>
                       <p className='mt-1 text-xs text-muted-foreground tabular-nums'>
@@ -130,20 +174,32 @@ export function Notifications() {
                       <Button
                         variant='ghost'
                         size='icon-sm'
+                        disabled={busy?.id === n.id}
                         onClick={() => toggleRead(n.id)}
                         aria-label={n.read ? 'Mark as unread' : 'Mark as read'}
                         title={n.read ? 'Mark as unread' : 'Mark as read'}
                       >
-                        {n.read ? <MailOpenIcon /> : <CheckIcon />}
+                        {busy?.id === n.id && busy.action === 'read' ? (
+                          <Spinner />
+                        ) : n.read ? (
+                          <MailOpenIcon />
+                        ) : (
+                          <CheckIcon />
+                        )}
                       </Button>
                       <Button
                         variant='ghost'
                         size='icon-sm'
+                        disabled={busy?.id === n.id}
                         onClick={() => remove(n.id)}
                         aria-label='Delete notification'
                         title='Delete'
                       >
-                        <Trash2Icon />
+                        {busy?.id === n.id && busy.action === 'delete' ? (
+                          <Spinner />
+                        ) : (
+                          <Trash2Icon />
+                        )}
                       </Button>
                     </div>
                   </li>

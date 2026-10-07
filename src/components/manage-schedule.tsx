@@ -38,7 +38,16 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Spinner } from '@/components/ui/spinner';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { useFakeLoad, wait } from '@/lib/fake-api';
 import {
   DAYS,
   classes,
@@ -97,10 +106,11 @@ function ScheduleFormSheet({
   editingId: number | null;
   details: DetailSchedule[];
   initial: FormValue;
-  onSave: (v: { subjectId: string; shiftId: number; teacherId: string }) => void;
+  onSave: (v: { subjectId: string; shiftId: number; teacherId: string }) => void | Promise<void>;
   onClose: () => void;
 }) {
   const [form, setForm] = React.useState<FormValue>(initial);
+  const [saving, setSaving] = React.useState(false);
 
   const subjectItems = subjects
     .filter((s) => s.grade === grade)
@@ -110,7 +120,7 @@ function ScheduleFormSheet({
   const takenShifts = new Set(
     details
       .filter((d) => d.scheduleId === scheduleId && d.day === day && d.detailId !== editingId)
-      .map((d) => d.shiftId)
+      .map((d) => d.shiftId),
   );
   const shiftItems = shifts.map((s) => ({
     value: String(s.shiftId),
@@ -121,7 +131,11 @@ function ScheduleFormSheet({
   const isBusy = (teacherId: string, shiftId: number | null) =>
     shiftId !== null &&
     details.some(
-      (d) => d.teacherId === teacherId && d.day === day && d.shiftId === shiftId && d.detailId !== editingId
+      (d) =>
+        d.teacherId === teacherId &&
+        d.day === day &&
+        d.shiftId === shiftId &&
+        d.detailId !== editingId,
     );
   const teacherItems = form.subjectId
     ? expertise
@@ -141,7 +155,7 @@ function ScheduleFormSheet({
     !isBusy(form.teacherId, form.shiftId);
 
   return (
-    <Sheet open onOpenChange={(open) => !open && onClose()}>
+    <Sheet open onOpenChange={(open) => !open && !saving && onClose()}>
       <SheetContent>
         <SheetHeader>
           <SheetTitle>{mode === 'insert' ? 'Insert Schedule' : 'Update Schedule'}</SheetTitle>
@@ -155,7 +169,9 @@ function ScheduleFormSheet({
             <Select
               items={subjectItems}
               value={form.subjectId || null}
-              onValueChange={(v) => v && setForm({ subjectId: v, shiftId: form.shiftId, teacherId: '' })}
+              onValueChange={(v) =>
+                v && setForm({ subjectId: v, shiftId: form.shiftId, teacherId: '' })
+              }
             >
               <SelectTrigger className='w-full' aria-label='Subject'>
                 <SelectValue placeholder='Select subject' />
@@ -178,7 +194,11 @@ function ScheduleFormSheet({
                 if (!v) return;
                 const shiftId = Number(v);
                 // kalau guru terpilih jadi bentrok di shift baru, kosongkan pilihan guru
-                setForm((f) => ({ ...f, shiftId, teacherId: isBusy(f.teacherId, shiftId) ? '' : f.teacherId }));
+                setForm((f) => ({
+                  ...f,
+                  shiftId,
+                  teacherId: isBusy(f.teacherId, shiftId) ? '' : f.teacherId,
+                }));
               }}
             >
               <SelectTrigger className='w-full' aria-label='Shift'>
@@ -186,7 +206,11 @@ function ScheduleFormSheet({
               </SelectTrigger>
               <SelectContent>
                 {shiftItems.map((i) => (
-                  <SelectItem key={i.value} value={i.value} disabled={takenShifts.has(Number(i.value))}>
+                  <SelectItem
+                    key={i.value}
+                    value={i.value}
+                    disabled={takenShifts.has(Number(i.value))}
+                  >
                     {i.label}
                   </SelectItem>
                 ))}
@@ -202,27 +226,48 @@ function ScheduleFormSheet({
               onValueChange={(v) => v && setForm((f) => ({ ...f, teacherId: v }))}
             >
               <SelectTrigger className='w-full' aria-label='Teacher'>
-                <SelectValue placeholder={form.subjectId ? 'Select teacher' : 'Select a subject first'} />
+                <SelectValue
+                  placeholder={form.subjectId ? 'Select teacher' : 'Select a subject first'}
+                />
               </SelectTrigger>
               <SelectContent>
                 {teacherItems.map((i) => (
-                  <SelectItem key={i.value} value={i.value} disabled={isBusy(i.value, form.shiftId)}>
+                  <SelectItem
+                    key={i.value}
+                    value={i.value}
+                    disabled={isBusy(i.value, form.shiftId)}
+                  >
                     {i.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <p className='text-xs text-muted-foreground'>
-              Only teachers with expertise in the subject are listed. Teachers already teaching another
-              class at the same shift are disabled.
+              Only teachers with expertise in the subject are listed. Teachers already teaching
+              another class at the same shift are disabled.
             </p>
           </div>
         </div>
         <SheetFooter className='border-t'>
-          <Button disabled={!valid} onClick={() => onSave({ subjectId: form.subjectId, shiftId: form.shiftId!, teacherId: form.teacherId })}>
-            Save
+          <Button
+            disabled={!valid || saving}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                await onSave({
+                  subjectId: form.subjectId,
+                  shiftId: form.shiftId!,
+                  teacherId: form.teacherId,
+                });
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            {saving && <Spinner />}
+            {saving ? 'Saving...' : 'Save'}
           </Button>
-          <Button variant='outline' onClick={onClose}>
+          <Button variant='outline' disabled={saving} onClick={onClose}>
             Cancel
           </Button>
         </SheetFooter>
@@ -302,12 +347,13 @@ export function ManageSchedule() {
   const [details, setDetails] = React.useState<DetailSchedule[]>(initialDetails);
   // buka kelas pertama yang masih draft supaya Insert/Update langsung bisa dicoba
   const [className, setClassName] = React.useState(
-    () => headerSchedules.find((h) => h.finalize === 0)?.className ?? classes[0].className
+    () => headerSchedules.find((h) => h.finalize === 0)?.className ?? classes[0].className,
   );
   const [day, setDay] = React.useState<Day>('Monday');
   const [inserting, setInserting] = React.useState(false);
   const [editing, setEditing] = React.useState<Row | null>(null);
   const [showNeeded, setShowNeeded] = React.useState(false);
+  const loading = useFakeLoad(`${className}|${day}`); // ganti dengan isLoading dari API
   const nextId = React.useRef(Math.max(...initialDetails.map((d) => d.detailId)) + 1);
 
   const room = classes.find((c) => c.className === className)!;
@@ -329,15 +375,21 @@ export function ManageSchedule() {
     }));
 
   const neededSubjects = subjects.filter((s) => s.grade === room.grade);
-  const scheduledSubjects = neededSubjects.filter((s) => classDetails.some((d) => d.subjectId === s.subjectId)).length;
+  const scheduledSubjects = neededSubjects.filter((s) =>
+    classDetails.some((d) => d.subjectId === s.subjectId),
+  ).length;
   const teachersInvolved = new Set(classDetails.map((d) => d.teacherId)).size;
 
-  const classItems = classes.map((c) => ({ value: c.className, label: `${c.className} · Grade ${gradeLabel[c.grade]}` }));
+  const classItems = classes.map((c) => ({
+    value: c.className,
+    label: `${c.className} · Grade ${gradeLabel[c.grade]}`,
+  }));
   const dayItems = DAYS.map((d) => ({ value: d, label: d }));
 
   return (
     <div className='flex flex-col gap-4 md:gap-6'>
       <StatCards
+        loading={loading}
         items={[
           {
             label: `Class ${className}`,
@@ -407,13 +459,19 @@ export function ManageSchedule() {
       )}
 
       <SimpleDataTable
+        loading={loading}
         data={rows}
         columns={columns}
         getRowId={(r) => String(r.detailId)}
         getRowLabel={(r) => `${r.subject} (${r.time})`}
         onEdit={finalized ? undefined : setEditing}
         onDelete={
-          finalized ? undefined : (r) => setDetails((d) => d.filter((x) => x.detailId !== r.detailId))
+          finalized
+            ? undefined
+            : async (r) => {
+                await wait(); // ganti dengan DELETE ke API
+                setDetails((d) => d.filter((x) => x.detailId !== r.detailId));
+              }
         }
         toolbarActions={
           <div className='flex gap-2'>
@@ -421,7 +479,7 @@ export function ManageSchedule() {
               <ListChecksIcon />
               View Subject Needed
             </Button>
-            <Button disabled={finalized} onClick={() => setInserting(true)}>
+            <Button disabled={finalized || loading} onClick={() => setInserting(true)}>
               <PlusIcon />
               Insert
             </Button>
@@ -440,8 +498,12 @@ export function ManageSchedule() {
           details={details}
           initial={{ subjectId: '', shiftId: null, teacherId: '' }}
           onClose={() => setInserting(false)}
-          onSave={(v) => {
-            setDetails((d) => [...d, { detailId: nextId.current++, scheduleId: header.scheduleId, day, ...v }]);
+          onSave={async (v) => {
+            await wait(); // ganti dengan POST ke API
+            setDetails((d) => [
+              ...d,
+              { detailId: nextId.current++, scheduleId: header.scheduleId, day, ...v },
+            ]);
             setInserting(false);
           }}
         />
@@ -456,9 +518,14 @@ export function ManageSchedule() {
           scheduleId={header.scheduleId}
           editingId={editing.detailId}
           details={details}
-          initial={{ subjectId: editing.subjectId, shiftId: editing.shiftId, teacherId: editing.teacherId }}
+          initial={{
+            subjectId: editing.subjectId,
+            shiftId: editing.shiftId,
+            teacherId: editing.teacherId,
+          }}
           onClose={() => setEditing(null)}
-          onSave={(v) => {
+          onSave={async (v) => {
+            await wait(); // ganti dengan PUT/PATCH ke API
             setDetails((d) => d.map((x) => (x.detailId === editing.detailId ? { ...x, ...v } : x)));
             setEditing(null);
           }}

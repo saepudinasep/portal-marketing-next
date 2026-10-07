@@ -9,7 +9,9 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
+import { Skeleton } from '@/components/ui/skeleton';
 import { sessionsPerDay } from '@/lib/dummy-data';
+import { useFakeLoad } from '@/lib/fake-api';
 
 const chartConfig = {
   finalized: { label: 'Finalized', color: 'var(--primary)' },
@@ -18,6 +20,7 @@ const chartConfig = {
 
 export function ScheduleLoadChart() {
   const data = sessionsPerDay();
+  const loading = useFakeLoad('weekly-load'); // ganti dengan isLoading dari API
 
   return (
     <Card className='@container/card'>
@@ -26,15 +29,24 @@ export function ScheduleLoadChart() {
         <CardDescription>Teaching sessions per day (finalized vs draft)</CardDescription>
       </CardHeader>
       <CardContent className='px-2 pt-4 sm:px-6 sm:pt-6'>
-        <ChartContainer config={chartConfig} className='aspect-auto h-[250px] w-full'>
-          <BarChart data={data}>
-            <CartesianGrid vertical={false} />
-            <XAxis dataKey='day' tickLine={false} axisLine={false} tickMargin={8} />
-            <ChartTooltip cursor={false} content={<ChartTooltipContent indicator='dot' />} />
-            <Bar dataKey='finalized' stackId='a' fill='var(--color-finalized)' radius={[0, 0, 4, 4]} />
-            <Bar dataKey='draft' stackId='a' fill='var(--color-draft)' radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ChartContainer>
+        {loading ? (
+          <Skeleton className='h-[250px] w-full' aria-busy='true' />
+        ) : (
+          <ChartContainer config={chartConfig} className='aspect-auto h-[250px] w-full'>
+            <BarChart data={data}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey='day' tickLine={false} axisLine={false} tickMargin={8} />
+              <ChartTooltip cursor={false} content={<ChartTooltipContent indicator='dot' />} />
+              <Bar
+                dataKey='finalized'
+                stackId='a'
+                fill='var(--color-finalized)'
+                radius={[0, 0, 4, 4]}
+              />
+              <Bar dataKey='draft' stackId='a' fill='var(--color-draft)' radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ChartContainer>
+        )}
       </CardContent>
     </Card>
   );

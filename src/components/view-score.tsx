@@ -14,9 +14,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useFakeLoad } from '@/lib/fake-api';
 import { PASSING_SCORE, detailClasses, scoreRows, students, subjects } from '@/lib/dummy-data';
 
-const avg = (n: number[]) => (n.length ? Math.round((n.reduce((a, b) => a + b, 0) / n.length) * 10) / 10 : 0);
+const avg = (n: number[]) =>
+  n.length ? Math.round((n.reduce((a, b) => a + b, 0) / n.length) * 10) / 10 : 0;
 
 type Row = {
   subjectId: string;
@@ -45,10 +47,13 @@ const columns: Column<Row>[] = [
 ];
 
 // hanya siswa yang sudah punya kelas yang punya nilai
-const studentOptions = students.filter((s) => detailClasses.some((d) => d.studentId === s.studentId));
+const studentOptions = students.filter((s) =>
+  detailClasses.some((d) => d.studentId === s.studentId),
+);
 
 export function ViewScore() {
   const [studentId, setStudentId] = React.useState(studentOptions[0].studentId);
+  const loading = useFakeLoad(studentId); // ganti dengan isLoading dari API
 
   const student = studentOptions.find((s) => s.studentId === studentId)!;
   const className = detailClasses.find((d) => d.studentId === studentId)?.className ?? '-';
@@ -69,11 +74,15 @@ export function ViewScore() {
   // bobot diambil dari mata pelajaran siswa (semua 20/30/50 di data dummy)
   const w = subjects.find((s) => s.subjectId === rows[0]?.subjectId) ?? subjects[0];
 
-  const studentItems = studentOptions.map((s) => ({ value: s.studentId, label: `${s.studentId} - ${s.name}` }));
+  const studentItems = studentOptions.map((s) => ({
+    value: s.studentId,
+    label: `${s.studentId} - ${s.name}`,
+  }));
 
   return (
     <div className='flex flex-col gap-4 md:gap-6'>
       <StatCards
+        loading={loading}
         items={[
           {
             label: 'Average Final Score',
@@ -105,7 +114,11 @@ export function ViewScore() {
       <div className='flex flex-col gap-1'>
         <div className='flex items-center gap-3'>
           <Label>Student</Label>
-          <Select items={studentItems} value={studentId} onValueChange={(v) => v && setStudentId(v)}>
+          <Select
+            items={studentItems}
+            value={studentId}
+            onValueChange={(v) => v && setStudentId(v)}
+          >
             <SelectTrigger className='w-72' aria-label='Student'>
               <SelectValue />
             </SelectTrigger>
@@ -123,7 +136,12 @@ export function ViewScore() {
         </p>
       </div>
 
-      <SimpleDataTable data={rows} columns={columns} getRowId={(r) => r.subjectId} />
+      <SimpleDataTable
+        loading={loading}
+        data={rows}
+        columns={columns}
+        getRowId={(r) => r.subjectId}
+      />
     </div>
   );
 }

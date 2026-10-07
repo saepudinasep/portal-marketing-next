@@ -1,7 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import { CalendarCheckIcon, CalendarDaysIcon, CheckIcon, ListChecksIcon, LockIcon } from 'lucide-react';
+import {
+  CalendarCheckIcon,
+  CalendarDaysIcon,
+  CheckIcon,
+  ListChecksIcon,
+  LockIcon,
+} from 'lucide-react';
 
 import { SimpleDataTable, type Column } from '@/components/simple-data-table';
 import { StatCards } from '@/components/stat-cards';
@@ -14,6 +20,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
+import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -23,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useFakeLoad, wait } from '@/lib/fake-api';
 import {
   DAYS,
   classes,
@@ -61,19 +69,26 @@ function missingSubjects(className: string) {
   const grade = classes.find((c) => c.className === className)!.grade;
   return subjects
     .filter((s) => s.grade === grade)
-    .filter((s) => !detailSchedules.some((d) => d.scheduleId === header.scheduleId && d.subjectId === s.subjectId));
+    .filter(
+      (s) =>
+        !detailSchedules.some(
+          (d) => d.scheduleId === header.scheduleId && d.subjectId === s.subjectId,
+        ),
+    );
 }
 
 export function FinalizeSchedule() {
   // className -> sudah difinalisasi? (cerminan HeaderSchedule.Finalize)
   const [finalized, setFinalized] = React.useState<Record<string, boolean>>(() =>
-    Object.fromEntries(headerSchedules.map((h) => [h.className, h.finalize === 1]))
+    Object.fromEntries(headerSchedules.map((h) => [h.className, h.finalize === 1])),
   );
   // buka kelas draft pertama supaya tombol Finalize langsung bisa dicoba
   const [className, setClassName] = React.useState(
-    () => headerSchedules.find((h) => h.finalize === 0)?.className ?? classes[0].className
+    () => headerSchedules.find((h) => h.finalize === 0)?.className ?? classes[0].className,
   );
   const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [finalizing, setFinalizing] = React.useState(false);
+  const loading = useFakeLoad(className); // ganti dengan isLoading dari API
 
   const room = classes.find((c) => c.className === className)!;
   const header = headerSchedules.find((h) => h.className === className)!;
@@ -97,7 +112,9 @@ export function FinalizeSchedule() {
 
   const totalClasses = classes.length;
   const finalizedCount = classes.filter((c) => finalized[c.className]).length;
-  const readyCount = classes.filter((c) => !finalized[c.className] && missingSubjects(c.className).length === 0).length;
+  const readyCount = classes.filter(
+    (c) => !finalized[c.className] && missingSubjects(c.className).length === 0,
+  ).length;
   const neededCount = subjects.filter((s) => s.grade === room.grade).length;
 
   const classItems = classes.map((c) => ({
@@ -108,6 +125,7 @@ export function FinalizeSchedule() {
   return (
     <div className='flex flex-col gap-4 md:gap-6'>
       <StatCards
+        loading={loading}
         items={[
           {
             label: 'Finalized Schedules',
@@ -153,7 +171,7 @@ export function FinalizeSchedule() {
           </Select>
           <Badge variant={isFinal ? 'default' : 'outline'}>{isFinal ? 'Finalized' : 'Draft'}</Badge>
         </div>
-        <Button disabled={!canFinalize} onClick={() => setConfirmOpen(true)}>
+        <Button disabled={!canFinalize || loading} onClick={() => setConfirmOpen(true)}>
           {isFinal ? <CheckIcon /> : <CalendarCheckIcon />}
           {isFinal ? 'Finalized' : 'Finalize'}
         </Button>
@@ -167,13 +185,19 @@ export function FinalizeSchedule() {
       )}
       {!isFinal && missing.length > 0 && (
         <div className='rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm'>
-          Cannot finalize yet. Not scheduled: {missing.map((s) => `${s.subjectId} ${s.name}`).join(', ')}.
+          Cannot finalize yet. Not scheduled:{' '}
+          {missing.map((s) => `${s.subjectId} ${s.name}`).join(', ')}.
         </div>
       )}
 
-      <SimpleDataTable data={rows} columns={columns} getRowId={(r) => String(r.detailId)} />
+      <SimpleDataTable
+        loading={loading}
+        data={rows}
+        columns={columns}
+        getRowId={(r) => String(r.detailId)}
+      />
 
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+      <AlertDialog open={confirmOpen} onOpenChange={(open) => !finalizing && setConfirmOpen(open)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Finalize schedule for {className}?</AlertDialogTitle>
@@ -183,16 +207,21 @@ export function FinalizeSchedule() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <Button variant='outline' onClick={() => setConfirmOpen(false)}>
+            <Button variant='outline' disabled={finalizing} onClick={() => setConfirmOpen(false)}>
               Cancel
             </Button>
             <Button
-              onClick={() => {
+              disabled={finalizing}
+              onClick={async () => {
+                setFinalizing(true);
+                await wait(); // ganti dengan PATCH HeaderSchedule.Finalize = 1 ke API
                 setFinalized((f) => ({ ...f, [className]: true }));
+                setFinalizing(false);
                 setConfirmOpen(false);
               }}
             >
-              Yes, finalize
+              {finalizing && <Spinner />}
+              {finalizing ? 'Finalizing...' : 'Yes, finalize'}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

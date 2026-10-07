@@ -7,13 +7,7 @@ import { AwardIcon, BookOpenCheckIcon, PercentIcon } from 'lucide-react';
 import { SimpleDataTable, type Column } from '@/components/simple-data-table';
 import { StatCards } from '@/components/stat-cards';
 import { Badge } from '@/components/ui/badge';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   ChartContainer,
   ChartTooltip,
@@ -21,6 +15,7 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -28,10 +23,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useFakeLoad } from '@/lib/fake-api';
 import { PASSING_SCORE, classes, reportScore, scoreRows, subjectOptions } from '@/lib/dummy-data';
 
 const gradeLabel: Record<number, string> = { 10: 'X', 11: 'XI', 12: 'XII' };
-const avg = (n: number[]) => (n.length ? Math.round((n.reduce((a, b) => a + b, 0) / n.length) * 10) / 10 : 0);
+const avg = (n: number[]) =>
+  n.length ? Math.round((n.reduce((a, b) => a + b, 0) / n.length) * 10) / 10 : 0;
 
 const chartConfig = {
   classA: { label: 'Class A', color: 'var(--primary)' },
@@ -65,12 +62,15 @@ const columns: Column<ClassRow>[] = [
 
 export function ReportScore() {
   const [subject, setSubject] = React.useState(subjectOptions[0]);
+  const loading = useFakeLoad(subject); // ganti dengan isLoading dari API
   const { chart, passedPercentage } = React.useMemo(() => reportScore(subject), [subject]);
 
   const classRows: ClassRow[] = React.useMemo(
     () =>
       classes.map((c) => {
-        const rows = scoreRows.filter((r) => r.subject.name === subject && r.className === c.className);
+        const rows = scoreRows.filter(
+          (r) => r.subject.name === subject && r.className === c.className,
+        );
         return {
           className: c.className,
           grade: gradeLabel[c.grade],
@@ -79,10 +79,12 @@ export function ReportScore() {
           midExam: avg(rows.map((r) => r.midExam ?? 0)),
           finalExam: avg(rows.map((r) => r.finalExam ?? 0)),
           final: avg(rows.map((r) => r.final)),
-          passed: rows.length ? Math.round((rows.filter((r) => r.final >= PASSING_SCORE).length / rows.length) * 100) : 0,
+          passed: rows.length
+            ? Math.round((rows.filter((r) => r.final >= PASSING_SCORE).length / rows.length) * 100)
+            : 0,
         };
       }),
-    [subject]
+    [subject],
   );
 
   const overall = avg(classRows.filter((r) => r.students > 0).map((r) => r.final));
@@ -92,6 +94,7 @@ export function ReportScore() {
   return (
     <div className='flex flex-col gap-4 md:gap-6'>
       <StatCards
+        loading={loading}
         items={[
           {
             label: `Average Final Score · ${subject}`,
@@ -140,24 +143,29 @@ export function ReportScore() {
         <CardHeader>
           <CardTitle>Average Score</CardTitle>
           <CardDescription>
-            Average final score per grade, Class A vs Class B · Passed percentage: {passedPercentage}%
+            Average final score per grade, Class A vs Class B · Passed percentage:{' '}
+            {passedPercentage}%
           </CardDescription>
         </CardHeader>
         <CardContent className='px-2 pt-4 sm:px-6 sm:pt-6'>
-          <ChartContainer config={chartConfig} className='aspect-auto h-[300px] w-full'>
-            <BarChart data={chart} margin={{ top: 20 }}>
-              <CartesianGrid vertical={false} />
-              <XAxis dataKey='grade' tickLine={false} axisLine={false} tickMargin={8} />
-              <YAxis domain={[0, 100]} tickLine={false} axisLine={false} width={32} />
-              <ChartTooltip cursor={false} content={<ChartTooltipContent indicator='dot' />} />
-              <Bar dataKey='classA' fill='var(--color-classA)' radius={4}>
-                <LabelList dataKey='classA' position='top' className='fill-foreground text-xs' />
-              </Bar>
-              <Bar dataKey='classB' fill='var(--color-classB)' radius={4}>
-                <LabelList dataKey='classB' position='top' className='fill-foreground text-xs' />
-              </Bar>
-            </BarChart>
-          </ChartContainer>
+          {loading ? (
+            <Skeleton className='h-[300px] w-full' aria-busy='true' />
+          ) : (
+            <ChartContainer config={chartConfig} className='aspect-auto h-[300px] w-full'>
+              <BarChart data={chart} margin={{ top: 20 }}>
+                <CartesianGrid vertical={false} />
+                <XAxis dataKey='grade' tickLine={false} axisLine={false} tickMargin={8} />
+                <YAxis domain={[0, 100]} tickLine={false} axisLine={false} width={32} />
+                <ChartTooltip cursor={false} content={<ChartTooltipContent indicator='dot' />} />
+                <Bar dataKey='classA' fill='var(--color-classA)' radius={4}>
+                  <LabelList dataKey='classA' position='top' className='fill-foreground text-xs' />
+                </Bar>
+                <Bar dataKey='classB' fill='var(--color-classB)' radius={4}>
+                  <LabelList dataKey='classB' position='top' className='fill-foreground text-xs' />
+                </Bar>
+              </BarChart>
+            </ChartContainer>
+          )}
         </CardContent>
       </Card>
 
@@ -168,6 +176,7 @@ export function ReportScore() {
         </CardHeader>
         <CardContent>
           <SimpleDataTable
+            loading={loading}
             data={classRows}
             columns={columns}
             getRowId={(r) => r.className}

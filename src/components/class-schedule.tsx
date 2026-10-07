@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useFakeLoad } from '@/lib/fake-api';
 import {
   DAYS,
   classes,
@@ -47,6 +48,7 @@ const columns: Column<Row>[] = [
 export function ClassSchedule() {
   const [className, setClassName] = React.useState(classes[0].className);
   const [day, setDay] = React.useState<string>(ALL);
+  const loading = useFakeLoad(`${className}|${day}`); // ganti dengan isLoading dari API
 
   const room = classes.find((c) => c.className === className)!;
   const header = headerSchedules.find((h) => h.className === className)!;
@@ -64,17 +66,23 @@ export function ClassSchedule() {
       teacher: getTeacher(d.teacherId).name,
     }));
   const rows = day === ALL ? weekRows : weekRows.filter((r) => r.day === day);
-  const teachersCount = new Set(detailSchedules.filter((d) => d.scheduleId === header.scheduleId).map((d) => d.teacherId)).size;
+  const teachersCount = new Set(
+    detailSchedules.filter((d) => d.scheduleId === header.scheduleId).map((d) => d.teacherId),
+  ).size;
 
   const classItems = classes.map((c) => ({
     value: c.className,
     label: `${c.className} · Grade ${gradeLabel[c.grade]}`,
   }));
-  const dayItems = [{ value: ALL, label: 'All days' }, ...DAYS.map((d) => ({ value: d, label: d }))];
+  const dayItems = [
+    { value: ALL, label: 'All days' },
+    ...DAYS.map((d) => ({ value: d, label: d })),
+  ];
 
   return (
     <div className='flex flex-col gap-4 md:gap-6'>
       <StatCards
+        loading={loading}
         items={[
           {
             label: `Class ${className}`,
@@ -137,7 +145,12 @@ export function ClassSchedule() {
         {!finalized && <Badge variant='outline'>Draft — this schedule may still change</Badge>}
       </div>
 
-      <SimpleDataTable data={rows} columns={columns} getRowId={(r) => String(r.detailId)} />
+      <SimpleDataTable
+        loading={loading}
+        data={rows}
+        columns={columns}
+        getRowId={(r) => String(r.detailId)}
+      />
     </div>
   );
 }

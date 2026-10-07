@@ -23,6 +23,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { Spinner } from '@/components/ui/spinner';
+import { useFakeLoad, wait } from '@/lib/fake-api';
 import { classes, students as initialStudents, type Student } from '@/lib/dummy-data';
 
 // columns berisi fungsi, jadi harus didefinisikan di file client (bukan di page server)
@@ -56,10 +58,11 @@ function StudentFormSheet({
   mode: 'insert' | 'update';
   student: Student;
   existingIds: string[];
-  onSave: (s: Student) => void;
+  onSave: (s: Student) => void | Promise<void>;
   onClose: () => void;
 }) {
   const [form, setForm] = React.useState<Student>(student);
+  const [saving, setSaving] = React.useState(false);
   const set = <K extends keyof Student>(key: K, value: Student[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
@@ -74,7 +77,7 @@ function StudentFormSheet({
     form.phoneNumber.trim() !== '';
 
   return (
-    <Sheet open onOpenChange={(open) => !open && onClose()}>
+    <Sheet open onOpenChange={(open) => !open && !saving && onClose()}>
       <SheetContent>
         <SheetHeader>
           <SheetTitle>{mode === 'insert' ? 'Insert Student' : 'Update Student'}</SheetTitle>
@@ -150,10 +153,21 @@ function StudentFormSheet({
           </div>
         </div>
         <SheetFooter className='border-t'>
-          <Button disabled={!valid} onClick={() => onSave({ ...form, studentId: id })}>
-            Save
+          <Button
+            disabled={!valid || saving}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                await onSave({ ...form, studentId: id });
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            {saving && <Spinner />}
+            {saving ? 'Saving...' : 'Save'}
           </Button>
-          <Button variant='outline' onClick={onClose}>
+          <Button variant='outline' disabled={saving} onClick={onClose}>
             Cancel
           </Button>
         </SheetFooter>
@@ -166,6 +180,7 @@ export function StudentTable() {
   const [data, setData] = React.useState<Student[]>(initialStudents);
   const [editing, setEditing] = React.useState<Student | null>(null);
   const [inserting, setInserting] = React.useState(false);
+  const loading = useFakeLoad('students'); // ganti dengan isLoading dari API
 
   // Card ikut berubah saat data di-insert/update/delete
   const total = data.length;
@@ -174,8 +189,9 @@ export function StudentTable() {
   const pct = (n: number) => (total ? `${Math.round((n / total) * 100)}%` : '0%');
 
   return (
-    <div className='flex flex-col gap-3'>
+    <div className='flex flex-col gap-3 md:gap-3'>
       <StatCards
+        loading={loading}
         items={[
           {
             label: 'Total Students',
@@ -205,15 +221,19 @@ export function StudentTable() {
       />
 
       <SimpleDataTable
+        loading={loading}
         data={data}
         columns={columns}
         getRowId={(s) => s.studentId}
         getRowLabel={(s) => s.name}
         searchText={(s) => `${s.studentId} ${s.name}`}
         onEdit={setEditing}
-        onDelete={(s) => setData((d) => d.filter((x) => x.studentId !== s.studentId))}
+        onDelete={async (s) => {
+          await wait(); // ganti dengan DELETE ke API
+          setData((d) => d.filter((x) => x.studentId !== s.studentId));
+        }}
         toolbarActions={
-          <Button onClick={() => setInserting(true)}>
+          <Button disabled={loading} onClick={() => setInserting(true)}>
             <PlusIcon />
             Insert
           </Button>
@@ -226,7 +246,8 @@ export function StudentTable() {
           student={emptyStudent}
           existingIds={data.map((s) => s.studentId)}
           onClose={() => setInserting(false)}
-          onSave={(s) => {
+          onSave={async (s) => {
+            await wait(); // ganti dengan POST ke API
             setData((d) => [s, ...d]); // tampil paling atas
             setInserting(false);
           }}
@@ -239,7 +260,8 @@ export function StudentTable() {
           student={editing}
           existingIds={[]}
           onClose={() => setEditing(null)}
-          onSave={(s) => {
+          onSave={async (s) => {
+            await wait(); // ganti dengan PUT/PATCH ke API
             setData((d) => d.map((x) => (x.studentId === s.studentId ? s : x)));
             setEditing(null);
           }}

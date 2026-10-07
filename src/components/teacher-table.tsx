@@ -5,6 +5,8 @@ import { CalendarCheckIcon, GraduationCapIcon, MarsIcon, PlusIcon, VenusIcon } f
 
 import { SimpleDataTable, type Column } from '@/components/simple-data-table';
 import { StatCards } from '@/components/stat-cards';
+import { Spinner } from '@/components/ui/spinner';
+import { useFakeLoad, wait } from '@/lib/fake-api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -61,10 +63,11 @@ function TeacherFormSheet({
   mode: 'insert' | 'update';
   teacher: Teacher;
   existingIds: string[];
-  onSave: (t: Teacher) => void;
+  onSave: (t: Teacher) => void | Promise<void>;
   onClose: () => void;
 }) {
   const [form, setForm] = React.useState<Teacher>(teacher);
+  const [saving, setSaving] = React.useState(false);
   const set = <K extends keyof Teacher>(key: K, value: Teacher[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
@@ -79,7 +82,7 @@ function TeacherFormSheet({
     form.phoneNumber.trim() !== '';
 
   return (
-    <Sheet open onOpenChange={(open) => !open && onClose()}>
+    <Sheet open onOpenChange={(open) => !open && !saving && onClose()}>
       <SheetContent>
         <SheetHeader>
           <SheetTitle>{mode === 'insert' ? 'Insert Teacher' : 'Update Teacher'}</SheetTitle>
@@ -155,10 +158,21 @@ function TeacherFormSheet({
           </div>
         </div>
         <SheetFooter className='border-t'>
-          <Button disabled={!valid} onClick={() => onSave({ ...form, teacherId: id })}>
-            Save
+          <Button
+            disabled={!valid || saving}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                await onSave({ ...form, teacherId: id });
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            {saving && <Spinner />}
+            {saving ? 'Saving...' : 'Save'}
           </Button>
-          <Button variant='outline' onClick={onClose}>
+          <Button variant='outline' disabled={saving} onClick={onClose}>
             Cancel
           </Button>
         </SheetFooter>
@@ -171,6 +185,7 @@ export function TeacherTable() {
   const [data, setData] = React.useState<Teacher[]>(initialTeachers);
   const [editing, setEditing] = React.useState<Teacher | null>(null);
   const [inserting, setInserting] = React.useState(false);
+  const loading = useFakeLoad('teachers'); // ganti dengan isLoading dari API
 
   // Card ikut berubah saat data di-insert/update/delete
   const total = data.length;
@@ -185,6 +200,7 @@ export function TeacherTable() {
   return (
     <div className='flex flex-col gap-4 md:gap-6'>
       <StatCards
+        loading={loading}
         items={[
           {
             label: 'Total Teachers',
@@ -222,15 +238,19 @@ export function TeacherTable() {
       />
 
       <SimpleDataTable
+        loading={loading}
         data={data}
         columns={columns}
         getRowId={(t) => t.teacherId}
         getRowLabel={(t) => t.name}
         searchText={(t) => `${t.teacherId} ${t.name}`}
         onEdit={setEditing}
-        onDelete={(t) => setData((d) => d.filter((x) => x.teacherId !== t.teacherId))}
+        onDelete={async (t) => {
+          await wait(); // ganti dengan DELETE ke API
+          setData((d) => d.filter((x) => x.teacherId !== t.teacherId));
+        }}
         toolbarActions={
-          <Button onClick={() => setInserting(true)}>
+          <Button disabled={loading} onClick={() => setInserting(true)}>
             <PlusIcon />
             Insert
           </Button>
@@ -243,7 +263,8 @@ export function TeacherTable() {
           teacher={emptyTeacher}
           existingIds={data.map((t) => t.teacherId)}
           onClose={() => setInserting(false)}
-          onSave={(t) => {
+          onSave={async (t) => {
+            await wait(); // ganti dengan POST ke API
             setData((d) => [t, ...d]); // tampil paling atas
             setInserting(false);
           }}
@@ -256,7 +277,8 @@ export function TeacherTable() {
           teacher={editing}
           existingIds={[]}
           onClose={() => setEditing(null)}
-          onSave={(t) => {
+          onSave={async (t) => {
+            await wait(); // ganti dengan PUT/PATCH ke API
             setData((d) => d.map((x) => (x.teacherId === t.teacherId ? t : x)));
             setEditing(null);
           }}
