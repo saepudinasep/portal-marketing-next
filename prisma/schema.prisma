@@ -25,172 +25,184 @@ enum Gender {
   female
 }
 
+enum Day {
+  Monday
+  Tuesday
+  Wednesday
+  Thursday
+  Friday
+}
+
 model User {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  username String @unique // = teacherCode / studentCode (sesuai ERD)
+  password String // hash bcrypt, bukan teks asli
+  role     Role
 
-  username    String   @unique
-  email       String   @unique
-  password    String
-  
-  role        Role
+  // Tidak @unique: di MongoDB indeks unik pada field opsional hanya mengizinkan SATU dokumen kosong.
+  email String?
 
-  // foto profile
-  photo       String?
+  // foto profil (url Cloudinary) — hanya untuk admin; foto guru/siswa disimpan di Teacher.photo / Student.photo
+  photo String?
 
-  isActive    Boolean  @default(true)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  teacher     Teacher?
-  student     Student?
+  teacher Teacher?
+  student Student?
 }
 
 model Teacher {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  teacherCode String    @unique // TeacherID di ERD, mis. T0001
+  name        String
+  phoneNumber String?
+  gender      Gender
+  address     String?
+  dateOfBirth DateTime?
 
-  teacherCode   String   @unique
-  name          String
-
-  phoneNumber   String?
-  gender        Gender
-  address       String?
-  dateOfBirth   DateTime?
-
-  // foto guru
+  // foto guru: url + public_id Cloudinary (public_id dipakai untuk hapus/ganti foto)
   photo         String?
+  photoPublicId String?
 
-  userId        String   @unique @db.ObjectId
-  user          User     @relation(fields: [userId], references: [id])
+  // hapus User => Teacher ikut terhapus. Guru yang masih punya jadwal tidak bisa dihapus (Restrict).
+  userId String @unique @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  expertise     Expertise[]
+  expertise Expertise[]
+  schedules DetailSchedule[]
 
-  schedules     DetailSchedule[]
-
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Student {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  studentCode String    @unique // StudentID di ERD, mis. 20160001
+  name        String
+  phoneNumber String?
+  gender      Gender
+  address     String?
+  dateOfBirth DateTime?
 
-  studentCode   String   @unique
-  name          String
-
-  phoneNumber   String?
-  gender        Gender
-  address       String?
-  dateOfBirth   DateTime?
-
-  // foto siswa
   photo         String?
+  photoPublicId String?
 
-  userId        String   @unique @db.ObjectId
-  user          User     @relation(fields: [userId], references: [id])
+  userId String @unique @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  classes       DetailClass[]
-  scores        DetailScore[]
+  class  DetailClass? // satu siswa hanya di satu kelas
+  scores DetailScore[]
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Subject {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  id   String @id @default(auto()) @map("_id") @db.ObjectId
+  code String @unique // SubjectID di ERD, mis. S1001
+  name String
 
-  code          String   @unique
-  name          String
-
-  assignment    Int
-  midExam       Int
-  finalExam     Int
+  // bobot persen: assignment + midExam + finalExam = 100
+  assignment Int
+  midExam    Int
+  finalExam  Int
 
   shiftDuration Int
-  grade         Int
+  grade         Int // 10 | 11 | 12
 
-  schedules     DetailSchedule[]
-  expertise     Expertise[]
+  schedules DetailSchedule[]
+  expertise Expertise[]
 }
 
 model Class {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  id    String @id @default(auto()) @map("_id") @db.ObjectId
+  name  String @unique // ClassName di ERD, mis. XA
+  grade Int
 
-  name          String   @unique
-  grade         Int
-
-  students      DetailClass[]
-  schedules     HeaderSchedule[]
+  students DetailClass[]
+  schedule HeaderSchedule?
 }
 
 model Shift {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  number Int    @unique // urutan shift 1..8 (ShiftId di ERD)
+  time   String // "07:00 - 07:45"
 
-  time          String
-
-  schedules     DetailSchedule[]
+  schedules DetailSchedule[]
 }
 
 model HeaderSchedule {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  classId       String   @db.ObjectId
-  class         Class    @relation(fields: [classId], references: [id])
+  classId String @unique @db.ObjectId // satu header jadwal per kelas
+  class   Class  @relation(fields: [classId], references: [id])
 
-  finalized     Boolean  @default(false)
+  finalized Boolean @default(false)
 
-  details       DetailSchedule[]
+  details DetailSchedule[]
 }
 
 model DetailSchedule {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  scheduleId    String   @db.ObjectId
-  schedule      HeaderSchedule @relation(fields: [scheduleId], references: [id])
+  scheduleId String         @db.ObjectId
+  schedule   HeaderSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
 
-  subjectId     String   @db.ObjectId
-  subject       Subject  @relation(fields: [subjectId], references: [id])
+  subjectId String  @db.ObjectId
+  subject   Subject @relation(fields: [subjectId], references: [id])
 
-  teacherId     String   @db.ObjectId
-  teacher       Teacher  @relation(fields: [teacherId], references: [id])
+  teacherId String  @db.ObjectId
+  teacher   Teacher @relation(fields: [teacherId], references: [id])
 
-  shiftId       String   @db.ObjectId
-  shift         Shift    @relation(fields: [shiftId], references: [id])
+  shiftId String @db.ObjectId
+  shift   Shift  @relation(fields: [shiftId], references: [id])
 
-  day           String
+  day Day
 
-  scores        DetailScore[]
+  scores DetailScore[]
+
+  // Aturan bentrok dijaga langsung oleh database:
+  @@unique([scheduleId, day, shiftId]) // satu kelas tidak punya 2 pelajaran di hari+shift yang sama
+  @@unique([teacherId, day, shiftId]) // satu guru tidak mengajar 2 kelas di hari+shift yang sama
 }
 
 model DetailScore {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  scheduleId    String   @db.ObjectId
-  schedule      DetailSchedule @relation(fields: [scheduleId], references: [id])
+  // (di skema Anda bernama scheduleId; diganti detailId agar tidak membingungkan dengan HeaderSchedule)
+  detailId String         @db.ObjectId
+  detail   DetailSchedule @relation(fields: [detailId], references: [id])
 
-  studentId     String   @db.ObjectId
-  student       Student  @relation(fields: [studentId], references: [id])
+  studentId String  @db.ObjectId
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
-  assignment    Int?
-  midExam       Int?
-  finalExam     Int?
+  assignment Int?
+  midExam    Int?
+  finalExam  Int?
+
+  @@unique([detailId, studentId])
 }
 
 model DetailClass {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  classId        String   @db.ObjectId
-  class          Class    @relation(fields: [classId], references: [id])
+  classId String @db.ObjectId
+  class   Class  @relation(fields: [classId], references: [id])
 
-  studentId      String   @db.ObjectId
-  student        Student  @relation(fields: [studentId], references: [id])
+  studentId String  @unique @db.ObjectId
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 }
 
 model Expertise {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  teacherId     String   @db.ObjectId
-  teacher       Teacher  @relation(fields: [teacherId], references: [id])
+  teacherId String  @db.ObjectId
+  teacher   Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
 
-  subjectId     String   @db.ObjectId
-  subject       Subject  @relation(fields: [subjectId], references: [id])
+  subjectId String  @db.ObjectId
+  subject   Subject @relation(fields: [subjectId], references: [id])
+
+  @@unique([teacherId, subjectId])
 }
