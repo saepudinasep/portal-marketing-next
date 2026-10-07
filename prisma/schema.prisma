@@ -1,0 +1,196 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  teacher
+  student
+}
+
+enum Gender {
+  male
+  female
+}
+
+model User {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+
+  username    String   @unique
+  email       String   @unique
+  password    String
+  
+  role        Role
+
+  // foto profile
+  photo       String?
+
+  isActive    Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  teacher     Teacher?
+  student     Student?
+}
+
+model Teacher {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+
+  teacherCode   String   @unique
+  name          String
+
+  phoneNumber   String?
+  gender        Gender
+  address       String?
+  dateOfBirth   DateTime?
+
+  // foto guru
+  photo         String?
+
+  userId        String   @unique @db.ObjectId
+  user          User     @relation(fields: [userId], references: [id])
+
+  expertise     Expertise[]
+
+  schedules     DetailSchedule[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Student {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+
+  studentCode   String   @unique
+  name          String
+
+  phoneNumber   String?
+  gender        Gender
+  address       String?
+  dateOfBirth   DateTime?
+
+  // foto siswa
+  photo         String?
+
+  userId        String   @unique @db.ObjectId
+  user          User     @relation(fields: [userId], references: [id])
+
+  classes       DetailClass[]
+  scores        DetailScore[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Subject {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+
+  code          String   @unique
+  name          String
+
+  assignment    Int
+  midExam       Int
+  finalExam     Int
+
+  shiftDuration Int
+  grade         Int
+
+  schedules     DetailSchedule[]
+  expertise     Expertise[]
+}
+
+model Class {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+
+  name          String   @unique
+  grade         Int
+
+  students      DetailClass[]
+  schedules     HeaderSchedule[]
+}
+
+model Shift {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+
+  time          String
+
+  schedules     DetailSchedule[]
+}
+
+model HeaderSchedule {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+
+  classId       String   @db.ObjectId
+  class         Class    @relation(fields: [classId], references: [id])
+
+  finalized     Boolean  @default(false)
+
+  details       DetailSchedule[]
+}
+
+model DetailSchedule {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+
+  scheduleId    String   @db.ObjectId
+  schedule      HeaderSchedule @relation(fields: [scheduleId], references: [id])
+
+  subjectId     String   @db.ObjectId
+  subject       Subject  @relation(fields: [subjectId], references: [id])
+
+  teacherId     String   @db.ObjectId
+  teacher       Teacher  @relation(fields: [teacherId], references: [id])
+
+  shiftId       String   @db.ObjectId
+  shift         Shift    @relation(fields: [shiftId], references: [id])
+
+  day           String
+
+  scores        DetailScore[]
+}
+
+model DetailScore {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+
+  scheduleId    String   @db.ObjectId
+  schedule      DetailSchedule @relation(fields: [scheduleId], references: [id])
+
+  studentId     String   @db.ObjectId
+  student       Student  @relation(fields: [studentId], references: [id])
+
+  assignment    Int?
+  midExam       Int?
+  finalExam     Int?
+}
+
+model DetailClass {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+
+  classId        String   @db.ObjectId
+  class          Class    @relation(fields: [classId], references: [id])
+
+  studentId      String   @db.ObjectId
+  student        Student  @relation(fields: [studentId], references: [id])
+}
+
+model Expertise {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+
+  teacherId     String   @db.ObjectId
+  teacher       Teacher  @relation(fields: [teacherId], references: [id])
+
+  subjectId     String   @db.ObjectId
+  subject       Subject  @relation(fields: [subjectId], references: [id])
+}
