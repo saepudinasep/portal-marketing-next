@@ -3,10 +3,10 @@
 import * as React from 'react';
 import { CalendarCheckIcon, GraduationCapIcon, MarsIcon, PlusIcon, VenusIcon } from 'lucide-react';
 
+import type { ActionResult } from '@/actions/result';
+import { createTeacher, deleteTeacher, updateTeacher } from '@/actions/teachers';
 import { SimpleDataTable, type Column } from '@/components/simple-data-table';
 import { StatCards } from '@/components/stat-cards';
-import { Spinner } from '@/components/ui/spinner';
-import { useFakeLoad, wait } from '@/lib/fake-api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,12 +25,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import {
-  classes,
-  detailSchedules,
-  teachers as initialTeachers,
-  type Teacher,
-} from '@/lib/dummy-data';
+import { Spinner } from '@/components/ui/spinner';
+import type { Teacher } from '@/lib/dummy-data';
 
 // columns berisi fungsi, jadi harus didefinisikan di file client (bukan di page server)
 const columns: Column<Teacher>[] = [
@@ -52,7 +48,7 @@ const emptyTeacher: Teacher = {
   photo: null,
 };
 
-/** Satu form untuk Insert dan Update. Batas panjang mengikuti data dictionary. */
+/** Satu form untuk Insert dan Update. Validasi akhir dilakukan di server (Zod). */
 function TeacherFormSheet({
   mode,
   teacher,
@@ -63,13 +59,16 @@ function TeacherFormSheet({
   mode: 'insert' | 'update';
   teacher: Teacher;
   existingIds: string[];
-  onSave: (t: Teacher) => void | Promise<void>;
+  onSave: (t: Teacher) => Promise<ActionResult>;
   onClose: () => void;
 }) {
   const [form, setForm] = React.useState<Teacher>(teacher);
   const [saving, setSaving] = React.useState(false);
-  const set = <K extends keyof Teacher>(key: K, value: Teacher[K]) =>
+  const [error, setError] = React.useState('');
+  const set = <K extends keyof Teacher>(key: K, value: Teacher[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
+    setError('');
+  };
 
   const id = form.teacherId.trim();
   const duplicateId = mode === 'insert' && existingIds.includes(id);
@@ -80,6 +79,20 @@ function TeacherFormSheet({
     form.address.trim() !== '' &&
     form.dateOfBirth !== '' &&
     form.phoneNumber.trim() !== '';
+
+  const submit = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      const result = await onSave({ ...form, teacherId: id });
+      if (result.ok) onClose();
+      else setError(result.error);
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Sheet open onOpenChange={(open) => !open && !saving && onClose()}>
@@ -151,24 +164,20 @@ function TeacherFormSheet({
             <Label htmlFor='phone'>Phone Number</Label>
             <Input
               id='phone'
+              inputMode='numeric'
               maxLength={12}
               value={form.phoneNumber}
-              onChange={(e) => set('phoneNumber', e.target.value)}
+              onChange={(e) => set('phoneNumber', e.target.value.replace(/\D/g, ''))}
             />
           </div>
+          {error && (
+            <p role='alert' className='text-sm text-destructive'>
+              {error}
+            </p>
+          )}
         </div>
         <SheetFooter className='border-t'>
-          <Button
-            disabled={!valid || saving}
-            onClick={async () => {
-              setSaving(true);
-              try {
-                await onSave({ ...form, teacherId: id });
-              } finally {
-                setSaving(false);
-              }
-            }}
-          >
+          <Button disabled={!valid || saving} onClick={submit}>
             {saving && <Spinner />}
             {saving ? 'Saving...' : 'Save'}
           </Button>
@@ -181,32 +190,37 @@ function TeacherFormSheet({
   );
 }
 
-export function TeacherTable() {
-  const [data, setData] = React.useState<Teacher[]>(initialTeachers);
+export function TeacherTable({
+  initialData,
+  classCount,
+  scheduledCount,
+}: {
+  initialData: Teacher[];
+  classCount: number;
+  /** Jumlah guru yang punya jadwal mengajar (dihitung di server). */
+  scheduledCount: number;
+}) {
+  // Data datang dari server (props). Setelah Server Action memanggil revalidatePath,
+  // Next.js mengirim props baru sehingga tabel ikut ter-update.
+  const data = initialData;
   const [editing, setEditing] = React.useState<Teacher | null>(null);
   const [inserting, setInserting] = React.useState(false);
-  const loading = useFakeLoad('teachers'); // ganti dengan isLoading dari API
 
   // Card ikut berubah saat data di-insert/update/delete
   const total = data.length;
   const male = data.filter((t) => t.gender === 'Male').length;
   const female = total - male;
-  // Guru terhubung ke jadwal lewat DetailSchedule.teacherId (DetailClass hanya untuk siswa)
-  const scheduled = data.filter((t) =>
-    detailSchedules.some((d) => d.teacherId === t.teacherId),
-  ).length;
   const pct = (n: number) => (total ? `${Math.round((n / total) * 100)}%` : '0%');
 
   return (
     <div className='flex flex-col gap-4 md:gap-6'>
       <StatCards
-        loading={loading}
         items={[
           {
             label: 'Total Teachers',
             value: total,
             icon: GraduationCapIcon,
-            badge: `${classes.length} classes`,
+            badge: `${classCount} classes`,
             title: 'Registered teachers',
             note: 'Teaching grade X, XI and XII',
           },
@@ -228,29 +242,25 @@ export function TeacherTable() {
           },
           {
             label: 'With Teaching Schedule',
-            value: `${scheduled}/${total}`,
+            value: `${scheduledCount}/${total}`,
             icon: CalendarCheckIcon,
-            badge: pct(scheduled),
-            title: `${total - scheduled} teachers without a schedule`,
+            badge: pct(scheduledCount),
+            title: `${total - scheduledCount} teachers without a schedule`,
             note: 'Manage in the Manage Schedule page',
           },
         ]}
       />
 
       <SimpleDataTable
-        loading={loading}
         data={data}
         columns={columns}
         getRowId={(t) => t.teacherId}
         getRowLabel={(t) => t.name}
         searchText={(t) => `${t.teacherId} ${t.name}`}
         onEdit={setEditing}
-        onDelete={async (t) => {
-          await wait(); // ganti dengan DELETE ke API
-          setData((d) => d.filter((x) => x.teacherId !== t.teacherId));
-        }}
+        onDelete={(t) => deleteTeacher(t.teacherId)}
         toolbarActions={
-          <Button disabled={loading} onClick={() => setInserting(true)}>
+          <Button onClick={() => setInserting(true)}>
             <PlusIcon />
             Insert
           </Button>
@@ -263,11 +273,7 @@ export function TeacherTable() {
           teacher={emptyTeacher}
           existingIds={data.map((t) => t.teacherId)}
           onClose={() => setInserting(false)}
-          onSave={async (t) => {
-            await wait(); // ganti dengan POST ke API
-            setData((d) => [t, ...d]); // tampil paling atas
-            setInserting(false);
-          }}
+          onSave={createTeacher}
         />
       )}
       {editing && (
@@ -277,11 +283,7 @@ export function TeacherTable() {
           teacher={editing}
           existingIds={[]}
           onClose={() => setEditing(null)}
-          onSave={async (t) => {
-            await wait(); // ganti dengan PUT/PATCH ke API
-            setData((d) => d.map((x) => (x.teacherId === t.teacherId ? t : x)));
-            setEditing(null);
-          }}
+          onSave={updateTeacher}
         />
       )}
     </div>

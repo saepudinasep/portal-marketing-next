@@ -61,8 +61,11 @@ type Props<T> = {
   /** Kalau diisi, menu "Update" muncul di kolom Actions. */
   onEdit?: (row: T) => void;
   /** Kalau diisi, menu "Delete" muncul (dengan konfirmasi). */
-  /** Boleh async: dialog tetap terbuka dengan spinner sampai selesai. */
-  onDelete?: (row: T) => void | Promise<void>;
+  /**
+   * Boleh async: dialog tetap terbuka dengan spinner sampai selesai.
+   * Jika mengembalikan { ok: false, error }, dialog tetap terbuka dan menampilkan pesan error.
+   */
+  onDelete?: (row: T) => void | Promise<void | { ok: boolean; error?: string }>;
   /** Teks pada konfirmasi hapus, misal nama siswa. */
   getRowLabel?: (row: T) => string;
   pageSizeOptions?: number[];
@@ -89,6 +92,7 @@ export function SimpleDataTable<T>({
   const [pageSize, setPageSize] = React.useState(pageSizeOptions[0]);
   const [toDelete, setToDelete] = React.useState<T | null>(null);
   const [deleting, setDeleting] = React.useState(false);
+  const [deleteError, setDeleteError] = React.useState('');
 
   const filtered = searchText
     ? data.filter((r) => searchText(r).toLowerCase().includes(q.toLowerCase()))
@@ -173,7 +177,13 @@ export function SimpleDataTable<T>({
                           )}
                           {onEdit && onDelete && <DropdownMenuSeparator />}
                           {onDelete && (
-                            <DropdownMenuItem variant='destructive' onClick={() => setToDelete(r)}>
+                            <DropdownMenuItem
+                              variant='destructive'
+                              onClick={() => {
+                                setDeleteError('');
+                                setToDelete(r);
+                              }}
+                            >
                               <Trash2Icon />
                               <span>Delete</span>
                             </DropdownMenuItem>
@@ -292,6 +302,14 @@ export function SimpleDataTable<T>({
               will be permanently removed. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {deleteError && (
+            <p
+              role='alert'
+              className='rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive'
+            >
+              {deleteError}
+            </p>
+          )}
           <AlertDialogFooter>
             <Button variant='outline' disabled={deleting} onClick={() => setToDelete(null)}>
               Cancel
@@ -302,11 +320,18 @@ export function SimpleDataTable<T>({
               onClick={async () => {
                 if (!toDelete) return;
                 setDeleting(true);
+                setDeleteError('');
                 try {
-                  await onDelete?.(toDelete);
+                  const result = await onDelete?.(toDelete);
+                  if (result && result.ok === false) {
+                    setDeleteError(result.error ?? 'Failed to delete.'); // dialog tetap terbuka
+                  } else {
+                    setToDelete(null);
+                  }
+                } catch {
+                  setDeleteError('Network error. Please try again.');
                 } finally {
                   setDeleting(false);
-                  setToDelete(null);
                 }
               }}
             >
