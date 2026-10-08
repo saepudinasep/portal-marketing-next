@@ -1,18 +1,36 @@
-'use client';
+import type { Metadata } from 'next';
 
-import { LoginForm } from '@/components/login-form';
 import Image from 'next/image';
 
-export default function LoginPage() {
+import { LoginForm } from '@/components/login-form';
+import { safeRedirect } from '@/lib/access';
+
+export const metadata: Metadata = { title: 'Login' };
+
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ callbackUrl?: string }>;
+}) {
+  const { callbackUrl } = await searchParams;
+
   return (
     <div className='grid min-h-svh lg:grid-cols-2'>
       <div className='flex flex-col gap-4 p-6 md:p-10'>
         <div className='flex flex-1 items-center justify-center'>
           <div className='w-full max-w-xs'>
-            <LoginForm />
+            <LoginForm
+              callbackUrl={safeRedirect(callbackUrl)}
+              devHint={
+                process.env.NODE_ENV === 'development'
+                  ? 'Dev seed: admin / admin1234 · T0001 / smk12345 · 20160001 / smk12345'
+                  : undefined
+              }
+            />
           </div>
         </div>
       </div>
+
       <div className='relative hidden bg-muted lg:block'>
         <Image
           src='/assets/images/login.jpeg'

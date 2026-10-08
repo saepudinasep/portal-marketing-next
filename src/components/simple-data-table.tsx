@@ -60,6 +60,8 @@ type Props<T> = {
   searchText?: (row: T) => string;
   /** Kalau diisi, menu "Update" muncul di kolom Actions. */
   onEdit?: (row: T) => void;
+  /** Teks menu aksi edit. Default "Update". */
+  editLabel?: string;
   /** Kalau diisi, menu "Delete" muncul (dengan konfirmasi). */
   /**
    * Boleh async: dialog tetap terbuka dengan spinner sampai selesai.
@@ -81,6 +83,7 @@ export function SimpleDataTable<T>({
   getRowId,
   searchText,
   onEdit,
+  editLabel = 'Update',
   onDelete,
   getRowLabel,
   pageSizeOptions = [5, 10, 20],
@@ -172,7 +175,7 @@ export function SimpleDataTable<T>({
                           {onEdit && (
                             <DropdownMenuItem onClick={() => onEdit(r)}>
                               <PencilIcon />
-                              <span>Update</span>
+                              <span>{editLabel}</span>
                             </DropdownMenuItem>
                           )}
                           {onEdit && onDelete && <DropdownMenuSeparator />}

@@ -9,6 +9,7 @@ import {
   CalendarClockIcon,
   CalendarRangeIcon,
   ClipboardCheckIcon,
+  SquarePenIcon,
 } from 'lucide-react';
 
 export const navMain = [
@@ -22,4 +23,5 @@ export const navMain = [
   { title: 'Teacher Schedule', url: '/teacher-schedule', icon: CalendarClockIcon },
   { title: 'Class Schedule', url: '/class-schedule', icon: CalendarRangeIcon },
   { title: 'View Score', url: '/view-score', icon: ClipboardCheckIcon },
+  { title: 'Input Score', url: '/input-score', icon: SquarePenIcon },
 ];

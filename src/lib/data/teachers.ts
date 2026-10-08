@@ -1,8 +1,11 @@
+import { requireRole } from '@/lib/auth-guard';
 import type { Teacher } from '@/lib/dummy-data';
 import { dateToUi, genderToUi } from '@/lib/mappers';
 import { prisma } from '@/lib/prisma';
 
 export async function getTeachersPageData() {
+  await requireRole('admin');
+
   const [rows, classCount, scheduledRows] = await Promise.all([
     prisma.teacher.findMany({ orderBy: { teacherCode: 'asc' } }),
     prisma.class.count(),
@@ -21,5 +24,9 @@ export async function getTeachersPageData() {
     photo: t.photo,
   }));
 
-  return { teachers, classCount, scheduledCount: rows.filter((t) => scheduledIds.has(t.id)).length };
+  return {
+    teachers,
+    classCount,
+    scheduledCount: rows.filter((t) => scheduledIds.has(t.id)).length,
+  };
 }

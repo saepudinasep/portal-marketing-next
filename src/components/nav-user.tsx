@@ -1,7 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
+import { BellIcon, CircleUserRoundIcon, EllipsisVerticalIcon, LogOutIcon } from 'lucide-react';
 
+import { logout } from '@/actions/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -18,11 +21,22 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { EllipsisVerticalIcon, CircleUserRoundIcon, BellIcon, LogOutIcon } from 'lucide-react';
+
+const roleLabel = { admin: 'Admin', teacher: 'Teacher', student: 'Student' } as const;
+
+const initialsOf = (name: string) =>
+  name
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || 'U';
 
 export function NavUser({
   user,
 }: {
+  // Data cadangan (dipakai bila sesi belum termuat); sesi login yang asli diutamakan.
   user: {
     name: string;
     email: string;
@@ -30,6 +44,14 @@ export function NavUser({
   };
 }) {
   const { isMobile } = useSidebar();
+  const { data: session } = useSession();
+  const me = session?.user;
+
+  const name = me?.name ?? user.name;
+  const avatar = me?.image ?? user.avatar;
+  // guru/siswa tidak punya email, jadi tampilkan username dan peran
+  const secondary = me ? (me.email ?? `${me.username} · ${roleLabel[me.role]}`) : user.email;
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -38,12 +60,12 @@ export function NavUser({
             render={<SidebarMenuButton size='lg' className='aria-expanded:bg-muted' />}
           >
             <Avatar className='size-8 rounded-lg grayscale'>
-              <AvatarImage src={user.avatar} alt={user.name} />
-              <AvatarFallback className='rounded-lg'>CN</AvatarFallback>
+              <AvatarImage src={avatar || undefined} alt={name} />
+              <AvatarFallback className='rounded-lg'>{initialsOf(name)}</AvatarFallback>
             </Avatar>
             <div className='grid flex-1 text-left text-sm leading-tight'>
-              <span className='truncate font-medium'>{user.name}</span>
-              <span className='truncate text-xs text-foreground/70'>{user.email}</span>
+              <span className='truncate font-medium'>{name}</span>
+              <span className='truncate text-xs text-foreground/70'>{secondary}</span>
             </div>
             <EllipsisVerticalIcon className='ml-auto size-4' />
           </DropdownMenuTrigger>
@@ -57,12 +79,12 @@ export function NavUser({
               <DropdownMenuLabel className='p-0 font-normal'>
                 <div className='flex items-center gap-2 px-1 py-1.5 text-left text-sm'>
                   <Avatar className='size-8'>
-                    <AvatarImage src={user.avatar} alt={user.name} />
-                    <AvatarFallback className='rounded-lg'>CN</AvatarFallback>
+                    <AvatarImage src={avatar || undefined} alt={name} />
+                    <AvatarFallback className='rounded-lg'>{initialsOf(name)}</AvatarFallback>
                   </Avatar>
                   <div className='grid flex-1 text-left text-sm leading-tight'>
-                    <span className='truncate font-medium'>{user.name}</span>
-                    <span className='truncate text-xs text-muted-foreground'>{user.email}</span>
+                    <span className='truncate font-medium'>{name}</span>
+                    <span className='truncate text-xs text-muted-foreground'>{secondary}</span>
                   </div>
                 </div>
               </DropdownMenuLabel>
@@ -79,7 +101,7 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => logout()}>
               <LogOutIcon />
               Log out
             </DropdownMenuItem>
