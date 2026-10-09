@@ -11,8 +11,9 @@ export function LoginForm({
   className,
   callbackUrl = '/dashboard',
   devHint,
+  notice,
   ...props
-}: React.ComponentProps<'form'> & { callbackUrl?: string; devHint?: string }) {
+}: React.ComponentProps<'form'> & { callbackUrl?: string; devHint?: string; notice?: string }) {
   const [error, formAction, pending] = React.useActionState(login, undefined);
   const [show, setShow] = React.useState(false);
   return (
@@ -49,13 +50,6 @@ export function LoginForm({
           <div className='flex items-center'>
             {' '}
             <FieldLabel htmlFor='password'>Password</FieldLabel>{' '}
-            <a
-              href='/forgot-password'
-              className='ml-auto text-sm underline-offset-4 hover:underline'
-            >
-              {' '}
-              Lupa Password?{' '}
-            </a>{' '}
           </div>{' '}
           <div className='relative'>
             {' '}
@@ -80,6 +74,11 @@ export function LoginForm({
             </button>{' '}
           </div>{' '}
         </Field>{' '}
+        {notice && !error && (
+          <p role='status' className='text-sm text-emerald-600 dark:text-emerald-400'>
+            {notice}
+          </p>
+        )}
         {error && (
           <p role='alert' className='text-sm text-destructive'>
             {' '}
@@ -93,6 +92,9 @@ export function LoginForm({
             {pending && <Spinner />} {pending ? 'Signing in...' : 'Login'}{' '}
           </Button>{' '}
         </Field>{' '}
+        <p className='text-center text-xs text-muted-foreground'>
+          Lupa password? Hubungi administrator sekolah untuk mengatur ulang password Anda.
+        </p>
         {devHint && <p className='text-center text-xs text-muted-foreground'> {devHint} </p>}{' '}
       </FieldGroup>{' '}
     </form>

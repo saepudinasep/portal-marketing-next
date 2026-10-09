@@ -17,6 +17,11 @@ export const authConfig = {
       // Belum login: hanya /login yang boleh. `false` => redirect ke /login?callbackUrl=...
       if (!user) return pathname === '/login';
 
+      // Akun dengan password sementara: hanya boleh membuka /account sampai password diganti.
+      if (user.mustChangePassword) {
+        return pathname === '/account' ? true : Response.redirect(new URL('/account', nextUrl));
+      }
+
       // Sudah login: /login dan / diarahkan ke halaman awal sesuai peran.
       if (pathname === '/login' || pathname === '/') {
         return Response.redirect(new URL(ROLE_HOME[user.role], nextUrl));
@@ -33,6 +38,7 @@ export const authConfig = {
         token.uid = user.id as string;
         token.role = user.role;
         token.username = user.username;
+        token.mustChangePassword = user.mustChangePassword;
       }
       return token;
     },
@@ -40,6 +46,7 @@ export const authConfig = {
       session.user.id = token.uid;
       session.user.role = token.role;
       session.user.username = token.username;
+      session.user.mustChangePassword = token.mustChangePassword;
       return session;
     },
   },

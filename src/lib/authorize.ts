@@ -33,6 +33,7 @@ export async function authorizeCredentials(raw: unknown) {
     id: user.id,
     username: user.username,
     role: user.role,
+    mustChangePassword: user.mustChangePassword,
     name: user.teacher?.name ?? user.student?.name ?? 'Administrator',
     email: user.email,
     image: user.teacher?.photo ?? user.student?.photo ?? user.photo,

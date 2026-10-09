@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useSession } from 'next-auth/react';
 import { CameraIcon, CheckIcon, KeyRoundIcon } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -18,6 +19,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { changePassword, logoutAfterPasswordChange } from '@/actions/account';
 import { currentProfile, currentUser } from '@/lib/current-user';
 import { wait } from '@/lib/fake-api';
 
@@ -199,7 +201,6 @@ function ProfileCard() {
 }
 
 function PasswordCard() {
-  const [current, setCurrent] = React.useState(currentUser.password);
   const [oldPw, setOldPw] = React.useState('');
   const [newPw, setNewPw] = React.useState('');
   const [confirmPw, setConfirmPw] = React.useState('');
@@ -215,20 +216,32 @@ function PasswordCard() {
   };
 
   const save = async () => {
-    if (oldPw !== current) return setError('Old password is incorrect.');
-    if (newPw.length < 6 || newPw.length > 10)
-      return setError('New password must be 6-10 characters.');
-    if (newPw === oldPw) return setError('New password must be different from the old password.');
-    if (confirmPw !== newPw) return setError('Confirm password does not match.');
     setSaving(true);
-    await wait(); // ganti dengan POST ganti password ke API
-    setSaving(false);
-    setCurrent(newPw);
-    setOldPw('');
-    setNewPw('');
-    setConfirmPw('');
     setError('');
-    setMessage('Password changed successfully.');
+    setMessage('');
+    let changed = false;
+    try {
+      const result = await changePassword({
+        oldPassword: oldPw,
+        newPassword: newPw,
+        confirmPassword: confirmPw,
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      changed = true;
+      setOldPw('');
+      setNewPw('');
+      setConfirmPw('');
+      setMessage('Password changed. Signing you out, please log in with your new password...');
+      await logoutAfterPasswordChange(); // mengalihkan ke /login
+    } catch {
+      // setelah sukses, error di sini hanyalah efek pengalihan halaman; abaikan
+      if (!changed) setError('Network error. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -238,7 +251,9 @@ function PasswordCard() {
           <KeyRoundIcon className='size-4' />
           Change Password
         </CardTitle>
-        <CardDescription>Use 6 to 10 characters</CardDescription>
+        <CardDescription>
+          At least 8 characters with uppercase, lowercase, number and symbol
+        </CardDescription>
       </CardHeader>
       <CardContent className='flex flex-col gap-4'>
         <div className='flex flex-col gap-2'>
@@ -259,7 +274,7 @@ function PasswordCard() {
           <Input
             id='pw-new'
             type={type}
-            maxLength={10}
+            maxLength={72}
             autoComplete='new-password'
             value={newPw}
             onChange={(e) => {
@@ -273,7 +288,7 @@ function PasswordCard() {
           <Input
             id='pw-confirm'
             type={type}
-            maxLength={10}
+            maxLength={72}
             autoComplete='new-password'
             value={confirmPw}
             onChange={(e) => {
@@ -306,10 +321,23 @@ function PasswordCard() {
 }
 
 export function Account() {
+  const { data: session } = useSession();
+  const mustChange = session?.user.mustChangePassword;
+
   return (
-    <div className='grid items-start gap-4 md:gap-6 lg:grid-cols-2'>
-      <ProfileCard />
-      <PasswordCard />
+    <div className='flex flex-col gap-4 md:gap-6'>
+      {mustChange && (
+        <div
+          role='alert'
+          className='rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm'
+        >
+          You are using a temporary password. Change it below to continue using the portal.
+        </div>
+      )}
+      <div className='grid items-start gap-4 md:gap-6 lg:grid-cols-2'>
+        <ProfileCard />
+        <PasswordCard />
+      </div>
     </div>
   );
 }

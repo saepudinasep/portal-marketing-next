@@ -5,10 +5,17 @@ import { navMain } from '@/config/nav';
 import { Separator } from '@/components/ui/separator';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 
+// Halaman yang tidak ada di menu sidebar (dibuka dari menu pengguna)
+const extraTitles: Record<string, string> = {
+  '/account': 'Account',
+  '/notifications': 'Notifications',
+};
+
 export function SiteHeader() {
   const pathname = usePathname();
   const title =
     navMain.find((item) => pathname === item.url || pathname.startsWith(`${item.url}/`))?.title ??
+    extraTitles[pathname] ??
     'SMK Nusantara';
 
   return (

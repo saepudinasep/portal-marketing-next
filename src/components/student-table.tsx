@@ -1,10 +1,16 @@
 'use client';
 
 import * as React from 'react';
-import { GraduationCapIcon, MarsIcon, PlusIcon, VenusIcon } from 'lucide-react';
+import { GraduationCapIcon, MarsIcon, KeyRoundIcon, PlusIcon, VenusIcon } from 'lucide-react';
 
-import { createStudent, deleteStudent, updateStudent } from '@/actions/students';
+import {
+  createStudent,
+  deleteStudent,
+  resetStudentPassword,
+  updateStudent,
+} from '@/actions/students';
 import type { ActionResult } from '@/actions/result';
+import { ResetPasswordDialog } from '@/components/reset-password-dialog';
 import { SimpleDataTable, type Column } from '@/components/simple-data-table';
 import { StatCards } from '@/components/stat-cards';
 import { Button } from '@/components/ui/button';
@@ -202,6 +208,7 @@ export function StudentTable({
   const data = initialData;
   const [editing, setEditing] = React.useState<Student | null>(null);
   const [inserting, setInserting] = React.useState(false);
+  const [resetting, setResetting] = React.useState<{ id: string; name: string } | null>(null);
 
   // Card ikut berubah saat data di-insert/update/delete
   const total = data.length;
@@ -247,6 +254,13 @@ export function StudentTable({
         getRowLabel={(s) => s.name}
         searchText={(s) => `${s.studentId} ${s.name}`}
         onEdit={setEditing}
+        extraActions={[
+          {
+            label: 'Reset Password',
+            icon: <KeyRoundIcon />,
+            onSelect: (row) => setResetting({ id: row.studentId, name: row.name }),
+          },
+        ]}
         onDelete={(s) => deleteStudent(s.studentId)}
         toolbarActions={
           <Button onClick={() => setInserting(true)}>
@@ -273,6 +287,16 @@ export function StudentTable({
           existingIds={[]}
           onClose={() => setEditing(null)}
           onSave={updateStudent}
+        />
+      )}
+
+      {resetting && (
+        <ResetPasswordDialog
+          key={resetting.id}
+          name={resetting.name}
+          noun='student'
+          onReset={() => resetStudentPassword(resetting.id)}
+          onClose={() => setResetting(null)}
         />
       )}
     </div>

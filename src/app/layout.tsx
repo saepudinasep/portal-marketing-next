@@ -16,11 +16,11 @@ const geistMono = Geist_Mono({
 });
 
 // Judul tab dinamis: setiap page mengisi `title`, template menambahkan nama aplikasi.
-// Contoh: export const metadata = { title: "Manage Student" }  ->  "Manage Student | Portal Marketing"
+// Contoh: export const metadata = { title: "Manage Student" }  ->  "Manage Student | SMK Nusantara"
 export const metadata: Metadata = {
   title: {
-    default: 'Portal Marketing',
-    template: '%s | Portal Marketing',
+    default: 'SMK Nusantara',
+    template: '%s | SMK Nusantara',
   },
   description:
     'SMK Nusantara information system: students, teachers, classes, schedules and scores.',

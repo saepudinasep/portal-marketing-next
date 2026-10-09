@@ -10,9 +10,9 @@ export const metadata: Metadata = { title: 'Login' };
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ callbackUrl?: string }>;
+  searchParams: Promise<{ callbackUrl?: string; changed?: string }>;
 }) {
-  const { callbackUrl } = await searchParams;
+  const { callbackUrl, changed } = await searchParams;
 
   return (
     <div className='grid min-h-svh lg:grid-cols-2'>
@@ -21,6 +21,11 @@ export default async function LoginPage({
           <div className='w-full max-w-xs'>
             <LoginForm
               callbackUrl={safeRedirect(callbackUrl)}
+              notice={
+                changed
+                  ? 'Password berhasil diubah. Silakan masuk dengan password baru.'
+                  : undefined
+              }
               devHint={
                 process.env.NODE_ENV === 'development'
                   ? 'Dev seed: admin / admin1234 · T0001 / smk12345 · 20160001 / smk12345'

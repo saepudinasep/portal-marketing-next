@@ -62,6 +62,8 @@ type Props<T> = {
   onEdit?: (row: T) => void;
   /** Teks menu aksi edit. Default "Update". */
   editLabel?: string;
+  /** Aksi tambahan di menu baris (mis. Reset Password), tampil setelah menu edit. */
+  extraActions?: { label: string; icon?: React.ReactNode; onSelect: (row: T) => void }[];
   /** Kalau diisi, menu "Delete" muncul (dengan konfirmasi). */
   /**
    * Boleh async: dialog tetap terbuka dengan spinner sampai selesai.
@@ -84,6 +86,7 @@ export function SimpleDataTable<T>({
   searchText,
   onEdit,
   editLabel = 'Update',
+  extraActions,
   onDelete,
   getRowLabel,
   pageSizeOptions = [5, 10, 20],
@@ -105,7 +108,7 @@ export function SimpleDataTable<T>({
   const currentPage = Math.min(page, pageCount - 1); // otomatis mundur kalau data berkurang
   const start = currentPage * pageSize;
   const rows = filtered.slice(start, start + pageSize);
-  const hasActions = Boolean(onEdit || onDelete);
+  const hasActions = Boolean(onEdit || onDelete || extraActions?.length);
 
   return (
     <div className='flex flex-col gap-3'>
@@ -178,7 +181,15 @@ export function SimpleDataTable<T>({
                               <span>{editLabel}</span>
                             </DropdownMenuItem>
                           )}
-                          {onEdit && onDelete && <DropdownMenuSeparator />}
+                          {extraActions?.map((a) => (
+                            <DropdownMenuItem key={a.label} onClick={() => a.onSelect(r)}>
+                              {a.icon}
+                              <span>{a.label}</span>
+                            </DropdownMenuItem>
+                          ))}
+                          {(onEdit || extraActions?.length) && onDelete && (
+                            <DropdownMenuSeparator />
+                          )}
                           {onDelete && (
                             <DropdownMenuItem
                               variant='destructive'

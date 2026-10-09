@@ -34,10 +34,10 @@ const initialsOf = (name: string) =>
     .toUpperCase() || 'U';
 
 export function NavUser({
-  user,
+  user = { name: 'User', email: '', avatar: '' },
 }: {
-  // Data cadangan (dipakai bila sesi belum termuat); sesi login yang asli diutamakan.
-  user: {
+  // Opsional: data cadangan bila sesi belum termuat. Sumber utama adalah sesi login.
+  user?: {
     name: string;
     email: string;
     avatar: string;

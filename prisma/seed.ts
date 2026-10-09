@@ -13,6 +13,33 @@ import * as d from '../src/lib/dummy-data';
 
 const prisma = new PrismaClient();
 
+/** Menampilkan host/database tujuan (tanpa username & password) agar jelas apa yang akan dihapus. */
+function describeTarget() {
+  const match = (process.env.DATABASE_URL ?? '').match(/@([^/?]+)\/?([^?]*)/);
+  return match ? `${match[1]}/${match[2] || '(database bawaan)'}` : '(tidak terbaca)';
+}
+
+/** Seed MENGHAPUS semua data. Hanya jalan bila diizinkan eksplisit dan bukan production. */
+function assertSafeToWipe() {
+  if (process.env.NODE_ENV === 'production') {
+    console.error(
+      'Seed ditolak: NODE_ENV=production. Untuk produksi pakai `npm run db:create-admin`.',
+    );
+    process.exit(1);
+  }
+  if (process.env.SEED_ALLOW_WIPE !== 'true') {
+    console.error(
+      [
+        'Seed ditolak: skrip ini MENGHAPUS semua data di database tujuan:',
+        `  ${describeTarget()}`,
+        'Jika ini database development, tambahkan SEED_ALLOW_WIPE="true" di .env LOKAL Anda',
+        '(jangan pernah diisi di Vercel/produksi), lalu jalankan ulang.',
+      ].join('\n'),
+    );
+    process.exit(1);
+  }
+}
+
 // Password awal (HANYA untuk dev/demo, wajib diganti lewat halaman Account).
 const DEFAULT_PASSWORD = process.env.SEED_DEFAULT_PASSWORD ?? 'smk12345';
 const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'admin1234';
@@ -36,6 +63,8 @@ async function reset() {
 }
 
 async function main() {
+  assertSafeToWipe();
+  console.log(`Target database: ${describeTarget()}`);
   console.log('Menghapus data lama...');
   await reset();
 
