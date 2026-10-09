@@ -39,3 +39,20 @@ export async function authorizeCredentials(raw: unknown) {
     image: user.teacher?.photo ?? user.student?.photo ?? user.photo,
   };
 }
+
+/** Nama dan foto terbaru dari database, dipakai saat sesi diperbarui (setelah ubah profil/foto). */
+export async function loadSessionProfile(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      photo: true,
+      teacher: { select: { name: true, photo: true } },
+      student: { select: { name: true, photo: true } },
+    },
+  });
+  if (!user) return null;
+  return {
+    name: user.teacher?.name ?? user.student?.name ?? 'Administrator',
+    image: user.teacher?.photo ?? user.student?.photo ?? user.photo ?? null,
+  };
+}

@@ -65,3 +65,40 @@ export const changePasswordSchema = z
     path: ['confirmPassword'],
     message: 'Confirm password does not match.',
   });
+
+// ----- Profil sendiri (halaman Account) -----
+export const photoMetaSchema = z.object({
+  publicId: z.string('Invalid photo. Please upload it again.').min(1).max(200),
+  version: z.number('Invalid photo. Please upload it again.').int().positive(),
+  format: z.enum(['jpg', 'jpeg', 'png', 'webp'], 'Photo must be JPG, PNG or WebP.'),
+});
+
+export const teacherProfileSchema = z.object({
+  name: person.name,
+  phoneNumber: person.phoneNumber,
+  address: z
+    .string()
+    .trim()
+    .min(1, 'Address is required.')
+    .max(100, 'Address must be at most 100 characters.'),
+  photo: photoMetaSchema.optional(),
+});
+
+export const studentProfileSchema = z.object({
+  name: person.name,
+  phoneNumber: person.phoneNumber,
+  address: z
+    .string()
+    .trim()
+    .min(1, 'Address is required.')
+    .max(150, 'Address must be at most 150 characters.'),
+  photo: photoMetaSchema.optional(),
+});
+
+export const adminProfileSchema = z.object({
+  email: z
+    .string('Email is required.')
+    .max(100, 'Email must be at most 100 characters.')
+    .refine((v) => v === '' || z.email().safeParse(v).success, 'Email is not valid.'),
+  photo: photoMetaSchema.optional(),
+});
