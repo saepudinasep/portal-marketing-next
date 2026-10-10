@@ -102,3 +102,31 @@ export const adminProfileSchema = z.object({
     .refine((v) => v === '' || z.email().safeParse(v).success, 'Email is not valid.'),
   photo: photoMetaSchema.optional(),
 });
+
+// ----- Kelas & jadwal (admin) -----
+const objectId = z
+  .string()
+  .regex(/^[a-f0-9]{24}$/i, 'Session not found. Refresh the page and try again.');
+
+export const classMembersSchema = z.object({
+  className: z.string().trim().min(1, 'Class is required.').max(5, 'Invalid class.'),
+  studentIds: z
+    .array(z.string().trim().min(1).max(8))
+    .min(1, 'Select at least one student.')
+    .max(500, 'Too many students selected at once.'),
+});
+
+const sessionFields = {
+  subjectId: z.string().trim().min(1, 'Subject is required.').max(5, 'Invalid subject.'),
+  teacherId: z.string().trim().min(1, 'Teacher is required.').max(8, 'Invalid teacher.'),
+  shiftId: z.number('Shift is required.').int().min(1, 'Invalid shift.').max(20, 'Invalid shift.'),
+};
+
+export const sessionCreateSchema = z.object({
+  className: z.string().trim().min(1, 'Class is required.').max(5, 'Invalid class.'),
+  day: z.enum(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], 'Day is required.'),
+  ...sessionFields,
+});
+
+export const sessionUpdateSchema = z.object({ id: objectId, ...sessionFields });
+export const sessionIdSchema = objectId;

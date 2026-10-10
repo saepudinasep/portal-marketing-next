@@ -10,6 +10,8 @@ import {
   UserRoundCheckIcon,
 } from 'lucide-react';
 
+import type { ActionResult } from '@/actions/result';
+import { createSession, deleteSession, updateSession } from '@/actions/schedules';
 import { SimpleDataTable, type Column } from '@/components/simple-data-table';
 import { StatCards } from '@/components/stat-cards';
 import {
@@ -22,6 +24,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -47,26 +50,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useFakeLoad, wait } from '@/lib/fake-api';
 import {
   DAYS,
-  classes,
-  detailSchedules as initialDetails,
-  expertise,
-  getShift,
-  getSubject,
-  getTeacher,
-  headerSchedules,
-  shifts,
-  subjects,
+  GRADE_LABEL,
   type Day,
-  type DetailSchedule,
-} from '@/lib/dummy-data';
-
-const gradeLabel: Record<number, string> = { 10: 'X', 11: 'XI', 12: 'XII' };
+  type ScheduleBundle,
+  type SessionDTO,
+  type SubjectInfo,
+} from '@/lib/schedule-types';
 
 type Row = {
-  detailId: number;
+  id: string;
   subjectId: string;
   subject: string;
   teacherId: string;
@@ -91,9 +85,8 @@ function ScheduleFormSheet({
   className,
   day,
   grade,
-  scheduleId,
   editingId,
-  details,
+  bundle,
   initial,
   onSave,
   onClose,
@@ -102,15 +95,16 @@ function ScheduleFormSheet({
   className: string;
   day: Day;
   grade: number;
-  scheduleId: number;
-  editingId: number | null;
-  details: DetailSchedule[];
+  editingId: string | null;
+  bundle: ScheduleBundle;
   initial: FormValue;
-  onSave: (v: { subjectId: string; shiftId: number; teacherId: string }) => void | Promise<void>;
+  onSave: (v: { subjectId: string; shiftId: number; teacherId: string }) => Promise<ActionResult>;
   onClose: () => void;
 }) {
+  const { subjects, teachers, shifts, sessions } = bundle;
   const [form, setForm] = React.useState<FormValue>(initial);
   const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState('');
 
   const subjectItems = subjects
     .filter((s) => s.grade === grade)
@@ -118,8 +112,8 @@ function ScheduleFormSheet({
 
   // shift yang sudah dipakai kelas ini pada hari yang sama
   const takenShifts = new Set(
-    details
-      .filter((d) => d.scheduleId === scheduleId && d.day === day && d.detailId !== editingId)
+    sessions
+      .filter((d) => d.className === className && d.day === day && d.id !== editingId)
       .map((d) => d.shiftId),
   );
   const shiftItems = shifts.map((s) => ({
@@ -130,17 +124,13 @@ function ScheduleFormSheet({
   // guru bentrok = sudah mengajar di kelas lain pada hari & shift yang sama
   const isBusy = (teacherId: string, shiftId: number | null) =>
     shiftId !== null &&
-    details.some(
+    sessions.some(
       (d) =>
-        d.teacherId === teacherId &&
-        d.day === day &&
-        d.shiftId === shiftId &&
-        d.detailId !== editingId,
+        d.teacherId === teacherId && d.day === day && d.shiftId === shiftId && d.id !== editingId,
     );
   const teacherItems = form.subjectId
-    ? expertise
-        .filter((e) => e.subjectId === form.subjectId)
-        .map((e) => getTeacher(e.teacherId))
+    ? teachers
+        .filter((t) => t.subjectIds.includes(form.subjectId))
         .map((t) => ({
           value: t.teacherId,
           label: `${t.teacherId} - ${t.name}${isBusy(t.teacherId, form.shiftId) ? ' - busy' : ''}`,
@@ -153,6 +143,24 @@ function ScheduleFormSheet({
     form.teacherId !== '' &&
     !takenShifts.has(form.shiftId) &&
     !isBusy(form.teacherId, form.shiftId);
+
+  const submit = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      const result = await onSave({
+        subjectId: form.subjectId,
+        shiftId: form.shiftId!,
+        teacherId: form.teacherId,
+      });
+      if (result.ok) onClose();
+      else setError(result.error); // aturan server (mis. jadwal baru saja difinalisasi) tampil di sini
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Sheet open onOpenChange={(open) => !open && !saving && onClose()}>
@@ -169,9 +177,11 @@ function ScheduleFormSheet({
             <Select
               items={subjectItems}
               value={form.subjectId || null}
-              onValueChange={(v) =>
-                v && setForm({ subjectId: v, shiftId: form.shiftId, teacherId: '' })
-              }
+              onValueChange={(v) => {
+                if (!v) return;
+                setForm({ subjectId: v, shiftId: form.shiftId, teacherId: '' });
+                setError('');
+              }}
             >
               <SelectTrigger className='w-full' aria-label='Subject'>
                 <SelectValue placeholder='Select subject' />
@@ -199,6 +209,7 @@ function ScheduleFormSheet({
                   shiftId,
                   teacherId: isBusy(f.teacherId, shiftId) ? '' : f.teacherId,
                 }));
+                setError('');
               }}
             >
               <SelectTrigger className='w-full' aria-label='Shift'>
@@ -223,7 +234,11 @@ function ScheduleFormSheet({
               items={teacherItems}
               value={form.teacherId || null}
               disabled={!form.subjectId}
-              onValueChange={(v) => v && setForm((f) => ({ ...f, teacherId: v }))}
+              onValueChange={(v) => {
+                if (!v) return;
+                setForm((f) => ({ ...f, teacherId: v }));
+                setError('');
+              }}
             >
               <SelectTrigger className='w-full' aria-label='Teacher'>
                 <SelectValue
@@ -247,23 +262,14 @@ function ScheduleFormSheet({
               another class at the same shift are disabled.
             </p>
           </div>
+          {error && (
+            <p role='alert' className='text-sm text-destructive'>
+              {error}
+            </p>
+          )}
         </div>
         <SheetFooter className='border-t'>
-          <Button
-            disabled={!valid || saving}
-            onClick={async () => {
-              setSaving(true);
-              try {
-                await onSave({
-                  subjectId: form.subjectId,
-                  shiftId: form.shiftId!,
-                  teacherId: form.teacherId,
-                });
-              } finally {
-                setSaving(false);
-              }
-            }}
-          >
+          <Button disabled={!valid || saving} onClick={submit}>
             {saving && <Spinner />}
             {saving ? 'Saving...' : 'Save'}
           </Button>
@@ -282,13 +288,15 @@ function SubjectNeededDialog({
   onClose,
   className,
   grade,
-  classDetails,
+  subjects,
+  classSessions,
 }: {
   open: boolean;
   onClose: () => void;
   className: string;
   grade: number;
-  classDetails: DetailSchedule[];
+  subjects: SubjectInfo[];
+  classSessions: SessionDTO[];
 }) {
   const needed = subjects.filter((s) => s.grade === grade);
 
@@ -298,7 +306,7 @@ function SubjectNeededDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Subjects needed for {className}</AlertDialogTitle>
           <AlertDialogDescription>
-            Subjects for grade {gradeLabel[grade]} and where they are scheduled this week.
+            Subjects for grade {GRADE_LABEL[grade]} and where they are scheduled this week.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className='overflow-hidden rounded-lg border'>
@@ -312,7 +320,7 @@ function SubjectNeededDialog({
             </TableHeader>
             <TableBody>
               {needed.map((s) => {
-                const slots = classDetails.filter((d) => d.subjectId === s.subjectId);
+                const slots = classSessions.filter((d) => d.subjectId === s.subjectId);
                 return (
                   <TableRow key={s.subjectId}>
                     <TableCell>{s.subjectId}</TableCell>
@@ -343,57 +351,66 @@ function SubjectNeededDialog({
   );
 }
 
-export function ManageSchedule() {
-  const [details, setDetails] = React.useState<DetailSchedule[]>(initialDetails);
+export function ManageSchedule({ bundle }: { bundle: ScheduleBundle }) {
+  const { classes, subjects, teachers, shifts, sessions } = bundle;
   // buka kelas pertama yang masih draft supaya Insert/Update langsung bisa dicoba
   const [className, setClassName] = React.useState(
-    () => headerSchedules.find((h) => h.finalize === 0)?.className ?? classes[0].className,
+    () => classes.find((c) => !c.finalized)?.className ?? classes[0]?.className ?? '',
   );
   const [day, setDay] = React.useState<Day>('Monday');
   const [inserting, setInserting] = React.useState(false);
   const [editing, setEditing] = React.useState<Row | null>(null);
   const [showNeeded, setShowNeeded] = React.useState(false);
-  const loading = useFakeLoad(`${className}|${day}`); // ganti dengan isLoading dari API
-  const nextId = React.useRef(Math.max(...initialDetails.map((d) => d.detailId)) + 1);
 
-  const room = classes.find((c) => c.className === className)!;
-  const header = headerSchedules.find((h) => h.className === className)!;
-  const finalized = header.finalize === 1;
+  const room = classes.find((c) => c.className === className);
+  if (!room) {
+    return (
+      <Card>
+        <CardContent className='flex h-32 items-center justify-center text-sm text-muted-foreground'>
+          No classes found in the database.
+        </CardContent>
+      </Card>
+    );
+  }
+  const finalized = room.finalized;
 
-  const classDetails = details.filter((d) => d.scheduleId === header.scheduleId);
-  const rows: Row[] = classDetails
+  const subjectName = (id: string) => subjects.find((s) => s.subjectId === id)?.name ?? id;
+  const teacherName = (id: string) => teachers.find((t) => t.teacherId === id)?.name ?? id;
+  const shiftTime = (no: number) => shifts.find((s) => s.shiftId === no)?.time ?? '-';
+
+  const classSessions = sessions.filter((d) => d.className === className);
+  const rows: Row[] = classSessions
     .filter((d) => d.day === day)
     .sort((a, b) => a.shiftId - b.shiftId)
     .map((d) => ({
-      detailId: d.detailId,
+      id: d.id,
       subjectId: d.subjectId,
-      subject: getSubject(d.subjectId).name,
+      subject: subjectName(d.subjectId),
       teacherId: d.teacherId,
-      teacher: getTeacher(d.teacherId).name,
+      teacher: teacherName(d.teacherId),
       shiftId: d.shiftId,
-      time: getShift(d.shiftId).time,
+      time: shiftTime(d.shiftId),
     }));
 
   const neededSubjects = subjects.filter((s) => s.grade === room.grade);
   const scheduledSubjects = neededSubjects.filter((s) =>
-    classDetails.some((d) => d.subjectId === s.subjectId),
+    classSessions.some((d) => d.subjectId === s.subjectId),
   ).length;
-  const teachersInvolved = new Set(classDetails.map((d) => d.teacherId)).size;
+  const teachersInvolved = new Set(classSessions.map((d) => d.teacherId)).size;
 
   const classItems = classes.map((c) => ({
     value: c.className,
-    label: `${c.className} · Grade ${gradeLabel[c.grade]}`,
+    label: `${c.className} · Grade ${GRADE_LABEL[c.grade]}`,
   }));
   const dayItems = DAYS.map((d) => ({ value: d, label: d }));
 
   return (
     <div className='flex flex-col gap-4 md:gap-6'>
       <StatCards
-        loading={loading}
         items={[
           {
             label: `Class ${className}`,
-            value: classDetails.length,
+            value: classSessions.length,
             icon: CalendarDaysIcon,
             badge: finalized ? 'Finalized' : 'Draft',
             title: 'Teaching sessions this week',
@@ -403,7 +420,7 @@ export function ManageSchedule() {
             label: 'Subjects Scheduled',
             value: `${scheduledSubjects}/${neededSubjects.length}`,
             icon: BookOpenIcon,
-            badge: `Grade ${gradeLabel[room.grade]}`,
+            badge: `Grade ${GRADE_LABEL[room.grade]}`,
             title: `${neededSubjects.length - scheduledSubjects} subjects not scheduled yet`,
             note: 'Use View Subject Needed for details',
           },
@@ -411,7 +428,7 @@ export function ManageSchedule() {
             label: 'Teachers Involved',
             value: teachersInvolved,
             icon: UserRoundCheckIcon,
-            badge: `${details.length} sessions`,
+            badge: `${sessions.length} sessions`,
             title: 'Teachers teaching this class',
             note: 'Badge shows sessions across all classes',
           },
@@ -459,27 +476,19 @@ export function ManageSchedule() {
       )}
 
       <SimpleDataTable
-        loading={loading}
         data={rows}
         columns={columns}
-        getRowId={(r) => String(r.detailId)}
+        getRowId={(r) => r.id}
         getRowLabel={(r) => `${r.subject} (${r.time})`}
         onEdit={finalized ? undefined : setEditing}
-        onDelete={
-          finalized
-            ? undefined
-            : async (r) => {
-                await wait(); // ganti dengan DELETE ke API
-                setDetails((d) => d.filter((x) => x.detailId !== r.detailId));
-              }
-        }
+        onDelete={finalized ? undefined : (r) => deleteSession(r.id)}
         toolbarActions={
           <div className='flex gap-2'>
             <Button variant='outline' onClick={() => setShowNeeded(true)}>
               <ListChecksIcon />
               View Subject Needed
             </Button>
-            <Button disabled={finalized || loading} onClick={() => setInserting(true)}>
+            <Button disabled={finalized} onClick={() => setInserting(true)}>
               <PlusIcon />
               Insert
             </Button>
@@ -493,42 +502,29 @@ export function ManageSchedule() {
           className={className}
           day={day}
           grade={room.grade}
-          scheduleId={header.scheduleId}
           editingId={null}
-          details={details}
+          bundle={bundle}
           initial={{ subjectId: '', shiftId: null, teacherId: '' }}
           onClose={() => setInserting(false)}
-          onSave={async (v) => {
-            await wait(); // ganti dengan POST ke API
-            setDetails((d) => [
-              ...d,
-              { detailId: nextId.current++, scheduleId: header.scheduleId, day, ...v },
-            ]);
-            setInserting(false);
-          }}
+          onSave={(v) => createSession({ className, day, ...v })}
         />
       )}
       {editing && (
         <ScheduleFormSheet
-          key={editing.detailId}
+          key={editing.id}
           mode='update'
           className={className}
           day={day}
           grade={room.grade}
-          scheduleId={header.scheduleId}
-          editingId={editing.detailId}
-          details={details}
+          editingId={editing.id}
+          bundle={bundle}
           initial={{
             subjectId: editing.subjectId,
             shiftId: editing.shiftId,
             teacherId: editing.teacherId,
           }}
           onClose={() => setEditing(null)}
-          onSave={async (v) => {
-            await wait(); // ganti dengan PUT/PATCH ke API
-            setDetails((d) => d.map((x) => (x.detailId === editing.detailId ? { ...x, ...v } : x)));
-            setEditing(null);
-          }}
+          onSave={(v) => updateSession({ id: editing.id, ...v })}
         />
       )}
       <SubjectNeededDialog
@@ -536,7 +532,8 @@ export function ManageSchedule() {
         onClose={() => setShowNeeded(false)}
         className={className}
         grade={room.grade}
-        classDetails={classDetails}
+        subjects={subjects}
+        classSessions={classSessions}
       />
     </div>
   );

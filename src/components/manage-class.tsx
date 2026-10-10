@@ -9,6 +9,7 @@ import {
   UsersIcon,
 } from 'lucide-react';
 
+import { assignStudents, removeStudents } from '@/actions/classes';
 import { StatCards } from '@/components/stat-cards';
 import {
   AlertDialog,
@@ -37,7 +38,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import {
   Table,
@@ -47,10 +47,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useFakeLoad, wait } from '@/lib/fake-api';
-import { classes, detailClasses, students, type Student } from '@/lib/dummy-data';
+import { GRADE_LABEL, type ClassStudent, type ManageClassData } from '@/lib/schedule-types';
 
-const gradeLabel: Record<number, string> = { 10: 'X', 11: 'XI', 12: 'XII' };
+const gradeLabel = GRADE_LABEL;
 
 function StudentPicker({
   title,
@@ -59,15 +58,13 @@ function StudentPicker({
   selected,
   onChange,
   emptyText,
-  loading = false,
 }: {
   title: string;
   description: string;
-  list: Student[];
+  list: ClassStudent[];
   selected: string[];
   onChange: (ids: string[]) => void;
   emptyText: string;
-  loading?: boolean;
 }) {
   const allSelected = list.length > 0 && selected.length === list.length;
   const toggle = (id: string, checked: boolean) =>
@@ -103,40 +100,25 @@ function StudentPicker({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading &&
-                Array.from({ length: 4 }).map((_, i) => (
-                  <TableRow key={`skeleton-${i}`} aria-busy='true'>
-                    <TableCell>
-                      <Skeleton className='size-4' />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className='h-4 w-20' />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className='h-4 w-32' />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              {!loading &&
-                list.map((s) => (
-                  <TableRow
-                    key={s.studentId}
-                    data-state={selected.includes(s.studentId) ? 'selected' : undefined}
-                    className='cursor-pointer'
-                    onClick={() => toggle(s.studentId, !selected.includes(s.studentId))}
-                  >
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        aria-label={`Select ${s.name}`}
-                        checked={selected.includes(s.studentId)}
-                        onCheckedChange={(checked) => toggle(s.studentId, checked)}
-                      />
-                    </TableCell>
-                    <TableCell>{s.studentId}</TableCell>
-                    <TableCell className='font-medium'>{s.name}</TableCell>
-                  </TableRow>
-                ))}
-              {!loading && list.length === 0 && (
+              {list.map((s) => (
+                <TableRow
+                  key={s.studentId}
+                  data-state={selected.includes(s.studentId) ? 'selected' : undefined}
+                  className='cursor-pointer'
+                  onClick={() => toggle(s.studentId, !selected.includes(s.studentId))}
+                >
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      aria-label={`Select ${s.name}`}
+                      checked={selected.includes(s.studentId)}
+                      onCheckedChange={(checked) => toggle(s.studentId, checked)}
+                    />
+                  </TableCell>
+                  <TableCell>{s.studentId}</TableCell>
+                  <TableCell className='font-medium'>{s.name}</TableCell>
+                </TableRow>
+              ))}
+              {list.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={3} className='h-24 text-center text-muted-foreground'>
                     {emptyText}
@@ -151,12 +133,8 @@ function StudentPicker({
   );
 }
 
-export function ManageClass() {
-  // studentId -> className (cerminan tabel DetailClass)
-  const [assignments, setAssignments] = React.useState<Record<string, string>>(() =>
-    Object.fromEntries(detailClasses.map((d) => [d.studentId, d.className])),
-  );
-  const [className, setClassName] = React.useState(classes[0].className);
+export function ManageClass({ classes, students, assignments }: ManageClassData) {
+  const [className, setClassName] = React.useState(classes[0]?.className ?? '');
   const [leftSel, setLeftSel] = React.useState<string[]>([]);
   const [rightSel, setRightSel] = React.useState<string[]>([]);
   // data konfirmasi disimpan terpisah dari `open` supaya isi dialog tidak berubah saat animasi tutup
@@ -165,39 +143,55 @@ export function ManageClass() {
   );
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [confirming, setConfirming] = React.useState(false);
-  const loading = useFakeLoad(className); // ganti dengan isLoading dari API
+  const [confirmError, setConfirmError] = React.useState('');
 
-  const room = classes.find((c) => c.className === className)!;
+  const room = classes.find((c) => c.className === className);
+  if (!room) {
+    return (
+      <Card>
+        <CardContent className='flex h-32 items-center justify-center text-sm text-muted-foreground'>
+          No classes found in the database.
+        </CardContent>
+      </Card>
+    );
+  }
+
   const available = students.filter((s) => !assignments[s.studentId]);
   const participants = students.filter((s) => assignments[s.studentId] === className);
   const male = participants.filter((s) => s.gender === 'Male').length;
   const assignedTotal = students.length - available.length;
 
+  // pilihan centang dibersihkan dari siswa yang statusnya sudah berubah (mis. oleh admin lain)
+  const leftIds = leftSel.filter((id) => !assignments[id]);
+  const rightIds = rightSel.filter((id) => assignments[id] === className);
+
   const askConfirm = (type: 'add' | 'remove') => {
-    setConfirm({ type, ids: type === 'add' ? leftSel : rightSel });
+    setConfirm({ type, ids: type === 'add' ? leftIds : rightIds });
+    setConfirmError('');
     setConfirmOpen(true);
   };
 
   const runConfirmed = async () => {
     if (!confirm) return;
     setConfirming(true);
-    await wait(); // ganti dengan POST/DELETE ke API (tabel DetailClass)
-    setConfirming(false);
-    if (confirm.type === 'add') {
-      setAssignments((a) => ({
-        ...a,
-        ...Object.fromEntries(confirm.ids.map((id) => [id, className])),
-      }));
-      setLeftSel([]);
-    } else {
-      setAssignments((a) => {
-        const next = { ...a };
-        confirm.ids.forEach((id) => delete next[id]);
-        return next;
-      });
-      setRightSel([]);
+    setConfirmError('');
+    try {
+      const result =
+        confirm.type === 'add'
+          ? await assignStudents(className, confirm.ids)
+          : await removeStudents(className, confirm.ids);
+      if (!result.ok) {
+        setConfirmError(result.error); // dialog tetap terbuka
+        return;
+      }
+      if (confirm.type === 'add') setLeftSel([]);
+      else setRightSel([]);
+      setConfirmOpen(false);
+    } catch {
+      setConfirmError('Network error. Please try again.');
+    } finally {
+      setConfirming(false);
     }
-    setConfirmOpen(false);
   };
 
   const confirmNames = (confirm?.ids ?? []).map(
@@ -209,7 +203,6 @@ export function ManageClass() {
   return (
     <div className='flex flex-col gap-4 md:gap-6'>
       <StatCards
-        loading={loading}
         items={[
           {
             label: `Class ${className}`,
@@ -266,8 +259,7 @@ export function ManageClass() {
           title='Student List'
           description='Students without a class. Check students, then press »'
           list={available}
-          loading={loading}
-          selected={leftSel}
+          selected={leftIds}
           onChange={setLeftSel}
           emptyText='All students already have a class.'
         />
@@ -275,18 +267,18 @@ export function ManageClass() {
           <Button
             variant='outline'
             size='icon'
-            disabled={leftSel.length === 0 || loading}
+            disabled={leftIds.length === 0}
             onClick={() => askConfirm('add')}
-            aria-label={`Add ${leftSel.length} selected students to ${className}`}
+            aria-label={`Add ${leftIds.length} selected students to ${className}`}
           >
             <ChevronsRightIcon className='max-lg:rotate-90' />
           </Button>
           <Button
             variant='outline'
             size='icon'
-            disabled={rightSel.length === 0 || loading}
+            disabled={rightIds.length === 0}
             onClick={() => askConfirm('remove')}
-            aria-label={`Remove ${rightSel.length} selected students from ${className}`}
+            aria-label={`Remove ${rightIds.length} selected students from ${className}`}
           >
             <ChevronsLeftIcon className='max-lg:rotate-90' />
           </Button>
@@ -295,8 +287,7 @@ export function ManageClass() {
           title='Participate Student'
           description={`Students in class ${className}. Check students, then press «`}
           list={participants}
-          loading={loading}
-          selected={rightSel}
+          selected={rightIds}
           onChange={setRightSel}
           emptyText='No students in this class yet.'
         />
@@ -321,6 +312,14 @@ export function ManageClass() {
               <li key={name}>{name}</li>
             ))}
           </ul>
+          {confirmError && (
+            <p
+              role='alert'
+              className='rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive'
+            >
+              {confirmError}
+            </p>
+          )}
           <AlertDialogFooter>
             <Button variant='outline' disabled={confirming} onClick={() => setConfirmOpen(false)}>
               Cancel

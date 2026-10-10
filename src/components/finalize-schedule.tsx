@@ -9,6 +9,7 @@ import {
   LockIcon,
 } from 'lucide-react';
 
+import { finalizeSchedule } from '@/actions/schedules';
 import { SimpleDataTable, type Column } from '@/components/simple-data-table';
 import { StatCards } from '@/components/stat-cards';
 import {
@@ -20,8 +21,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -30,22 +31,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useFakeLoad, wait } from '@/lib/fake-api';
-import {
-  DAYS,
-  classes,
-  detailSchedules,
-  getShift,
-  getSubject,
-  getTeacher,
-  headerSchedules,
-  subjects,
-} from '@/lib/dummy-data';
-
-const gradeLabel: Record<number, string> = { 10: 'X', 11: 'XI', 12: 'XII' };
+import { Spinner } from '@/components/ui/spinner';
+import { DAYS, GRADE_LABEL, type ScheduleBundle } from '@/lib/schedule-types';
 
 type Row = {
-  detailId: number;
+  id: string;
   subjectId: string;
   subject: string;
   teacherId: string;
@@ -63,75 +53,88 @@ const columns: Column<Row>[] = [
   { header: 'Shift', cell: (r) => r.shift, className: 'tabular-nums' },
 ];
 
-/** Mata pelajaran tingkat kelas ini yang belum punya satu pun sesi di jadwal. */
-function missingSubjects(className: string) {
-  const header = headerSchedules.find((h) => h.className === className)!;
-  const grade = classes.find((c) => c.className === className)!.grade;
-  return subjects
-    .filter((s) => s.grade === grade)
-    .filter(
-      (s) =>
-        !detailSchedules.some(
-          (d) => d.scheduleId === header.scheduleId && d.subjectId === s.subjectId,
-        ),
-    );
-}
-
-export function FinalizeSchedule() {
-  // className -> sudah difinalisasi? (cerminan HeaderSchedule.Finalize)
-  const [finalized, setFinalized] = React.useState<Record<string, boolean>>(() =>
-    Object.fromEntries(headerSchedules.map((h) => [h.className, h.finalize === 1])),
-  );
+export function FinalizeSchedule({ bundle }: { bundle: ScheduleBundle }) {
+  const { classes, subjects, teachers, shifts, sessions } = bundle;
   // buka kelas draft pertama supaya tombol Finalize langsung bisa dicoba
   const [className, setClassName] = React.useState(
-    () => headerSchedules.find((h) => h.finalize === 0)?.className ?? classes[0].className,
+    () => classes.find((c) => !c.finalized)?.className ?? classes[0]?.className ?? '',
   );
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [finalizing, setFinalizing] = React.useState(false);
-  const loading = useFakeLoad(className); // ganti dengan isLoading dari API
+  const [finalizeError, setFinalizeError] = React.useState('');
 
-  const room = classes.find((c) => c.className === className)!;
-  const header = headerSchedules.find((h) => h.className === className)!;
-  const isFinal = finalized[className];
+  const room = classes.find((c) => c.className === className);
+  if (!room) {
+    return (
+      <Card>
+        <CardContent className='flex h-32 items-center justify-center text-sm text-muted-foreground'>
+          No classes found in the database.
+        </CardContent>
+      </Card>
+    );
+  }
+  const isFinal = room.finalized;
 
-  const rows: Row[] = detailSchedules
-    .filter((d) => d.scheduleId === header.scheduleId)
+  /** Mata pelajaran tingkat kelas itu yang belum punya satu pun sesi di jadwal. */
+  const missingFor = (c: { className: string; grade: number }) =>
+    subjects.filter(
+      (s) =>
+        s.grade === c.grade &&
+        !sessions.some((d) => d.className === c.className && d.subjectId === s.subjectId),
+    );
+
+  const rows: Row[] = sessions
+    .filter((d) => d.className === className)
     .sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day) || a.shiftId - b.shiftId)
     .map((d) => ({
-      detailId: d.detailId,
+      id: d.id,
       subjectId: d.subjectId,
-      subject: getSubject(d.subjectId).name,
+      subject: subjects.find((s) => s.subjectId === d.subjectId)?.name ?? d.subjectId,
       teacherId: d.teacherId,
-      teacher: getTeacher(d.teacherId).name,
+      teacher: teachers.find((t) => t.teacherId === d.teacherId)?.name ?? d.teacherId,
       day: d.day,
-      shift: `${d.shiftId} (${getShift(d.shiftId).time})`,
+      shift: `${d.shiftId} (${shifts.find((s) => s.shiftId === d.shiftId)?.time ?? '-'})`,
     }));
 
-  const missing = missingSubjects(className);
+  const missing = missingFor(room);
   const canFinalize = !isFinal && rows.length > 0 && missing.length === 0;
 
   const totalClasses = classes.length;
-  const finalizedCount = classes.filter((c) => finalized[c.className]).length;
-  const readyCount = classes.filter(
-    (c) => !finalized[c.className] && missingSubjects(c.className).length === 0,
-  ).length;
+  const finalizedCount = classes.filter((c) => c.finalized).length;
+  const readyCount = classes.filter((c) => !c.finalized && missingFor(c).length === 0).length;
   const neededCount = subjects.filter((s) => s.grade === room.grade).length;
 
   const classItems = classes.map((c) => ({
     value: c.className,
-    label: `${c.className} · Grade ${gradeLabel[c.grade]} · ${finalized[c.className] ? 'Finalized' : 'Draft'}`,
+    label: `${c.className} · Grade ${GRADE_LABEL[c.grade]} · ${c.finalized ? 'Finalized' : 'Draft'}`,
   }));
+
+  const runFinalize = async () => {
+    setFinalizing(true);
+    setFinalizeError('');
+    try {
+      const result = await finalizeSchedule(className);
+      if (!result.ok) {
+        setFinalizeError(result.error); // dialog tetap terbuka
+        return;
+      }
+      setConfirmOpen(false); // props baru dari server membuat status kelas berubah jadi Finalized
+    } catch {
+      setFinalizeError('Network error. Please try again.');
+    } finally {
+      setFinalizing(false);
+    }
+  };
 
   return (
     <div className='flex flex-col gap-4 md:gap-6'>
       <StatCards
-        loading={loading}
         items={[
           {
             label: 'Finalized Schedules',
             value: `${finalizedCount}/${totalClasses}`,
             icon: CalendarCheckIcon,
-            badge: `${Math.round((finalizedCount / totalClasses) * 100)}%`,
+            badge: `${totalClasses ? Math.round((finalizedCount / totalClasses) * 100) : 0}%`,
             title: `${totalClasses - finalizedCount} schedules still in draft`,
             note: 'Finalized schedules are locked',
           },
@@ -171,7 +174,13 @@ export function FinalizeSchedule() {
           </Select>
           <Badge variant={isFinal ? 'default' : 'outline'}>{isFinal ? 'Finalized' : 'Draft'}</Badge>
         </div>
-        <Button disabled={!canFinalize || loading} onClick={() => setConfirmOpen(true)}>
+        <Button
+          disabled={!canFinalize}
+          onClick={() => {
+            setFinalizeError('');
+            setConfirmOpen(true);
+          }}
+        >
           {isFinal ? <CheckIcon /> : <CalendarCheckIcon />}
           {isFinal ? 'Finalized' : 'Finalize'}
         </Button>
@@ -190,12 +199,7 @@ export function FinalizeSchedule() {
         </div>
       )}
 
-      <SimpleDataTable
-        loading={loading}
-        data={rows}
-        columns={columns}
-        getRowId={(r) => String(r.detailId)}
-      />
+      <SimpleDataTable data={rows} columns={columns} getRowId={(r) => r.id} />
 
       <AlertDialog open={confirmOpen} onOpenChange={(open) => !finalizing && setConfirmOpen(open)}>
         <AlertDialogContent>
@@ -206,20 +210,19 @@ export function FinalizeSchedule() {
               updated, or deleted. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {finalizeError && (
+            <p
+              role='alert'
+              className='rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive'
+            >
+              {finalizeError}
+            </p>
+          )}
           <AlertDialogFooter>
             <Button variant='outline' disabled={finalizing} onClick={() => setConfirmOpen(false)}>
               Cancel
             </Button>
-            <Button
-              disabled={finalizing}
-              onClick={async () => {
-                setFinalizing(true);
-                await wait(); // ganti dengan PATCH HeaderSchedule.Finalize = 1 ke API
-                setFinalized((f) => ({ ...f, [className]: true }));
-                setFinalizing(false);
-                setConfirmOpen(false);
-              }}
-            >
+            <Button disabled={finalizing} onClick={runFinalize}>
               {finalizing && <Spinner />}
               {finalizing ? 'Finalizing...' : 'Yes, finalize'}
             </Button>
